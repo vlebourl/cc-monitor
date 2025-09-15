@@ -60,7 +60,11 @@ jobs:
             -keyalg RSA -keysize 2048 -validity 10000 \
             -storepass android -keypass android \
             -dname "CN=Android Debug,O=Android,C=US"
+          echo "✅ Debug keystore created successfully"
+        else
+          echo "✅ Debug keystore already exists"
         fi
+        ls -la debug.keystore
 
     - name: Accept Android SDK licenses
       run: yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses || true
@@ -94,7 +98,12 @@ jobs:
         # This would require setting up an emulator, which is complex in CI
         # For now, we'll just verify the APK can be parsed
         echo "Testing APK parsing..."
-        $ANDROID_SDK_ROOT/build-tools/*/aapt dump badging android/app/build/outputs/apk/debug/app-debug.apk | head -5
+        AAPT_PATH=$(find $ANDROID_SDK_ROOT/build-tools -name "aapt" | head -1)
+        if [ -n "$AAPT_PATH" ]; then
+          $AAPT_PATH dump badging android/app/build/outputs/apk/debug/app-debug.apk | head -5
+        else
+          echo "⚠️ aapt not found, skipping APK analysis"
+        fi
 
     - name: Upload debug APK artifact
       uses: actions/upload-artifact@v4
@@ -135,6 +144,9 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
 
     steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
     - name: Download debug APK
       uses: actions/download-artifact@v4
       with:
