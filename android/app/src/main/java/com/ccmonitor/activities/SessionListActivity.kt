@@ -240,7 +240,7 @@ fun SessionListScreen() {
                             verticalArrangement = Arrangement.Center
                         ) {
                             Icon(
-                                Icons.Default.FolderOpen,
+                                Icons.Default.Folder,
                                 contentDescription = "No sessions",
                                 modifier = Modifier.size(48.dp),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
@@ -390,7 +390,7 @@ fun SessionCard(
                         },
                         leadingIcon = {
                             Icon(
-                                if (session.isActive) Icons.Default.PlayCircle else Icons.Default.PauseCircle,
+                                if (session.isActive) Icons.Default.PlayArrow else Icons.Default.Pause,
                                 contentDescription = null,
                                 modifier = Modifier.size(14.dp)
                             )

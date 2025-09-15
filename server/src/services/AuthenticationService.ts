@@ -48,7 +48,7 @@ export class AuthenticationService extends EventEmitter {
   /**
    * Generate QR code with guest token for mobile authentication
    */
-  async generateAuthQR(): Promise<{ qrCode: string; guestToken: string }> {
+  async generateAuthQR(): Promise<{ qrCode: string; qrDataURL: string; guestToken: string }> {
     const guestToken = this.generateGuestToken();
     const authUrl = `${this.options.baseUrl}/auth?token=${guestToken.token}`;
 
@@ -65,6 +65,17 @@ export class AuthenticationService extends EventEmitter {
         }
       });
 
+      // Generate QR code as data URL for easier client display
+      const qrDataURL = await QRCode.toDataURL(authUrl, {
+        errorCorrectionLevel: 'M',
+        width: 280,
+        margin: 2,
+        color: {
+          dark: '#2c3e50',
+          light: '#ffffff'
+        }
+      });
+
       this.guestTokens.set(guestToken.token, guestToken);
 
       this.emit('qrGenerated', {
@@ -74,6 +85,7 @@ export class AuthenticationService extends EventEmitter {
 
       return {
         qrCode: qrCodeSvg,
+        qrDataURL: qrDataURL,
         guestToken: guestToken.token
       };
 

@@ -51,6 +51,12 @@
             android:exported="false"
             android:theme="@style/Theme.ClaudeCodeMonitor" />
 
+        <!-- Settings Activity -->
+        <activity
+            android:name=".activities.SettingsActivity"
+            android:exported="false"
+            android:theme="@style/Theme.ClaudeCodeMonitor" />
+
         <!-- WebSocket Service -->
         <service
             android:name=".services.WebSocketService"

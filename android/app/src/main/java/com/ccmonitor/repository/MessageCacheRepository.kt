@@ -1,7 +1,7 @@
 package com.ccmonitor.repository
 
 import android.content.Context
-import com.ccmonitor.SessionMessage
+import com.ccmonitor.data.SessionMessage
 import com.ccmonitor.database.ClaudeCodeDatabase
 import com.ccmonitor.database.entities.CachedMessage
 import com.ccmonitor.database.entities.SessionCache

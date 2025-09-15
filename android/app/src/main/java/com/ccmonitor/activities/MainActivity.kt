@@ -6,7 +6,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -90,7 +90,8 @@ fun MainScreen() {
                 title = { Text("Claude Code Monitor") },
                 actions = {
                     IconButton(onClick = {
-                        // TODO: Open settings
+                        val intent = Intent(context, SettingsActivity::class.java)
+                        context.startActivity(intent)
                     }) {
                         Icon(Icons.Default.Settings, contentDescription = "Settings")
                     }
@@ -200,7 +201,7 @@ fun MainScreen() {
                                 },
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Icon(Icons.Default.QrCodeScanner, contentDescription = null)
+                                Icon(Icons.Default.QrCode, contentDescription = null)
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text("Scan QR Code")
                             }
@@ -263,7 +264,7 @@ fun MainScreen() {
                                 },
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Icon(Icons.Default.QrCodeScanner, contentDescription = null)
+                                Icon(Icons.Default.QrCode, contentDescription = null)
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text("Scan New QR Code")
                             }

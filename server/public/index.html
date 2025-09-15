@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claude Code Monitor - Mobile Setup</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #333;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            padding: 40px;
+            max-width: 500px;
+            width: 90%;
+            text-align: center;
+        }
+
+        .logo {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+            font-size: 1.8rem;
+        }
+
+        .subtitle {
+            color: #7f8c8d;
+            margin-bottom: 30px;
+            font-size: 1rem;
+        }
+
+        .qr-container {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 30px;
+            margin: 30px 0;
+            border: 3px dashed #e9ecef;
+        }
+
+        #qrcode {
+            margin: 20px auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .instructions {
+            background: #e8f4f8;
+            border-left: 4px solid #3498db;
+            padding: 20px;
+            border-radius: 0 10px 10px 0;
+            margin: 20px 0;
+            text-align: left;
+        }
+
+        .instructions h3 {
+            color: #2980b9;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .instructions ol {
+            color: #34495e;
+            line-height: 1.6;
+            padding-left: 20px;
+        }
+
+        .instructions li {
+            margin-bottom: 8px;
+        }
+
+        .status {
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .status.loading {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+        }
+
+        .status.success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+
+        .refresh-btn {
+            background: linear-gradient(45deg, #3498db, #2980b9);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 500;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin: 10px;
+        }
+
+        .refresh-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(52, 152, 219, 0.3);
+        }
+
+        .refresh-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .spinner {
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #3498db;
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .timer {
+            font-size: 0.9rem;
+            color: #e74c3c;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+
+        .server-info {
+            background: #f1f2f6;
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 20px;
+            font-size: 0.9rem;
+            color: #57606f;
+        }
+
+        .server-info strong {
+            color: #2f3542;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">📱💻</div>
+        <h1>Claude Code Monitor</h1>
+        <p class="subtitle">Connect your Android device to monitor Claude Code sessions</p>
+
+        <div id="status" class="status loading">
+            <div class="spinner"></div>
+            Loading QR code...
+        </div>
+
+        <div class="qr-container">
+            <div id="qrcode"></div>
+            <div id="timer" class="timer" style="display: none;"></div>
+            <button id="refreshBtn" class="refresh-btn" onclick="generateNewQR()" disabled>
+                🔄 Generate New QR Code
+            </button>
+        </div>
+
+        <div class="instructions">
+            <h3>📋 Setup Instructions</h3>
+            <ol>
+                <li><strong>Install the APK</strong> on your Android phone</li>
+                <li><strong>Open the Claude Code Monitor app</strong></li>
+                <li><strong>Go to Settings</strong> and enter your server address:<br>
+                    <code id="serverAddress">cc-monitor.tiarkaerell.com</code></li>
+                <li><strong>Test the connection</strong> and save settings</li>
+                <li><strong>Return to main screen</strong> and tap "Scan QR Code"</li>
+                <li><strong>Scan the QR code above</strong> within the time limit</li>
+            </ol>
+        </div>
+
+        <div class="server-info">
+            <strong>Server Status:</strong> <span id="serverStatus">Checking...</span><br>
+            <strong>WebSocket:</strong> <span id="wsStatus">Checking...</span><br>
+            <strong>Version:</strong> <span id="serverVersion">Loading...</span>
+        </div>
+    </div>
+
+    <script src="/js/simple-qr.js"></script>
+    <script>
+        let qrTimer = null;
+        let countdownTimer = null;
+        let currentToken = null;
+
+        async function checkServerStatus() {
+            try {
+                const [healthResponse, versionResponse] = await Promise.all([
+                    fetch('/health'),
+                    fetch('/version')
+                ]);
+
+                const health = await healthResponse.json();
+                const version = await versionResponse.json();
+
+                document.getElementById('serverStatus').textContent = health.status === 'healthy' ? '✅ Healthy' : '❌ Unhealthy';
+                document.getElementById('wsStatus').textContent = health.services?.webSocket ? '✅ Running' : '❌ Offline';
+                document.getElementById('serverVersion').textContent = version.version || 'Unknown';
+            } catch (error) {
+                document.getElementById('serverStatus').textContent = '❌ Error';
+                document.getElementById('wsStatus').textContent = '❌ Error';
+                document.getElementById('serverVersion').textContent = 'Error';
+            }
+        }
+
+        async function generateNewQR() {
+            const statusEl = document.getElementById('status');
+            const refreshBtn = document.getElementById('refreshBtn');
+            const timerEl = document.getElementById('timer');
+            const qrEl = document.getElementById('qrcode');
+
+            // Reset UI
+            statusEl.className = 'status loading';
+            statusEl.innerHTML = '<div class="spinner"></div> Generating QR code...';
+            refreshBtn.disabled = true;
+            timerEl.style.display = 'none';
+            qrEl.innerHTML = '';
+
+            // Clear existing timers
+            if (qrTimer) clearTimeout(qrTimer);
+            if (countdownTimer) clearInterval(countdownTimer);
+
+            try {
+                const response = await fetch('/api/auth/qr', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Server error: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                if (!data.success) {
+                    throw new Error(data.error || 'Failed to generate QR code');
+                }
+
+                // Display server-generated QR code
+                if (data.data.qrDataURL) {
+                    // Use server-generated data URL
+                    const img = document.createElement('img');
+                    img.src = data.data.qrDataURL;
+                    img.style.width = '280px';
+                    img.style.height = '280px';
+                    img.style.border = '1px solid #ddd';
+                    img.style.borderRadius = '8px';
+                    qrEl.appendChild(img);
+                } else {
+                    // Fallback: display QR code text
+                    qrEl.innerHTML = `<div style="padding: 20px; border: 2px dashed #ccc; border-radius: 8px;">
+                        <strong>QR Code Data:</strong><br>
+                        <small style="word-break: break-all;">${data.data.qrCode || 'No QR data available'}</small>
+                    </div>`;
+                }
+
+                statusEl.className = 'status success';
+                statusEl.innerHTML = '✅ QR code ready! Scan with your Android app';
+                refreshBtn.disabled = false;
+                currentToken = data.data.guestToken;
+
+                // Start countdown timer
+                let timeLeft = data.data.expiresIn || 30;
+                timerEl.style.display = 'block';
+                timerEl.textContent = `Expires in ${timeLeft} seconds`;
+
+                countdownTimer = setInterval(() => {
+                    timeLeft--;
+                    if (timeLeft > 0) {
+                        timerEl.textContent = `Expires in ${timeLeft} seconds`;
+                    } else {
+                        timerEl.textContent = 'QR code expired';
+                        statusEl.className = 'status error';
+                        statusEl.innerHTML = '⏰ QR code expired - Generate a new one';
+                        clearInterval(countdownTimer);
+                    }
+                }, 1000);
+
+                // Auto-refresh after expiration
+                qrTimer = setTimeout(() => {
+                    statusEl.className = 'status error';
+                    statusEl.innerHTML = '⏰ QR code expired - Click to generate a new one';
+                }, (data.data.expiresIn || 30) * 1000);
+
+            } catch (error) {
+                statusEl.className = 'status error';
+                statusEl.innerHTML = `❌ Error: ${error.message}`;
+                refreshBtn.disabled = false;
+                console.error('QR generation error:', error);
+            }
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            checkServerStatus();
+            generateNewQR();
+
+            // Update server address based on current hostname
+            const serverAddress = document.getElementById('serverAddress');
+            if (serverAddress) {
+                serverAddress.textContent = window.location.hostname;
+            }
+        });
+
+        // Auto-check server status every 30 seconds
+        setInterval(checkServerStatus, 30000);
+    </script>
+</body>
+</html>

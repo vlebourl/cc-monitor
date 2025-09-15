@@ -21,7 +21,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.ccmonitor.ui.theme.ClaudeCodeMonitorTheme
 import com.ccmonitor.ConnectionHelper
-import com.ccmonitor.SessionMessage
+import com.ccmonitor.data.SessionMessage
 import com.ccmonitor.ConnectionState
 import kotlinx.coroutines.launch
 import java.time.LocalDateTime
@@ -145,15 +145,15 @@ fun MessageDisplayScreen(
                     ) {
                         Icon(
                             when (connectionState) {
-                                ConnectionState.CONNECTED -> Icons.Default.CloudDone
-                                ConnectionState.CONNECTING, ConnectionState.RECONNECTING -> Icons.Default.CloudSync
+                                ConnectionState.CONNECTED -> Icons.Default.CloudUpload
+                                ConnectionState.CONNECTING, ConnectionState.RECONNECTING -> Icons.Default.CloudQueue
                                 ConnectionState.FAILED -> Icons.Default.CloudOff
                                 ConnectionState.DISCONNECTED -> Icons.Default.CloudOff
                             },
                             contentDescription = "Connection status",
                             tint = when (connectionState) {
                                 ConnectionState.CONNECTED -> Color.Green
-                                ConnectionState.CONNECTING, ConnectionState.RECONNECTING -> Color.Orange
+                                ConnectionState.CONNECTING, ConnectionState.RECONNECTING -> Color(0xFFFF9800)
                                 else -> Color.Red
                             },
                             modifier = Modifier.size(20.dp)
@@ -163,7 +163,7 @@ fun MessageDisplayScreen(
                         sessionState?.let { state ->
                             Icon(
                                 when (state) {
-                                    "working" -> Icons.Default.AutoMode
+                                    "working" -> Icons.Default.Settings
                                     "waiting" -> Icons.Default.Schedule
                                     else -> Icons.Default.Pause
                                 },
@@ -227,7 +227,7 @@ fun MessageDisplayScreen(
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         Icon(
-                            Icons.Default.Chat,
+                            Icons.Default.Message,
                             contentDescription = "No messages",
                             modifier = Modifier.size(48.dp),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
@@ -270,8 +270,8 @@ fun MessageDisplayScreen(
 @Composable
 fun MessageBubble(message: SessionMessage) {
     // Parse message type to determine if it's from user or Claude
-    val isFromUser = message.messageType == "user"
-    val isFromClaude = message.messageType == "assistant" || message.messageType == "claude"
+    val isFromUser = message.data.messageType == "user"
+    val isFromClaude = message.data.messageType == "assistant" || message.data.messageType == "claude"
     val isSystemMessage = !isFromUser && !isFromClaude
 
     // Handle different message types
@@ -282,7 +282,7 @@ fun MessageBubble(message: SessionMessage) {
                 .fillMaxWidth()
                 .padding(vertical = 4.dp),
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest
+                containerColor = MaterialTheme.colorScheme.surfaceVariant
             )
         ) {
             Row(
@@ -291,7 +291,7 @@ fun MessageBubble(message: SessionMessage) {
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Icon(
-                    when (message.messageType) {
+                    when (message.data.messageType) {
                         "state" -> Icons.Default.Info
                         "timeout" -> Icons.Default.Schedule
                         else -> Icons.Default.Notifications
@@ -301,10 +301,10 @@ fun MessageBubble(message: SessionMessage) {
                     tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                 )
                 Text(
-                    text = when (message.messageType) {
-                        "state" -> "Session state: ${message.content}"
+                    text = when (message.data.messageType) {
+                        "state" -> "Session state: ${message.data.content}"
                         "timeout" -> "Session timeout"
-                        else -> message.content
+                        else -> message.data.content
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
@@ -331,7 +331,7 @@ fun MessageBubble(message: SessionMessage) {
                 .padding(horizontal = if (isFromClaude) 0.dp else 32.dp),
             colors = CardDefaults.cardColors(
                 containerColor = if (isFromClaude)
-                    MaterialTheme.colorScheme.surfaceContainerHigh
+                    MaterialTheme.colorScheme.surface
                 else
                     MaterialTheme.colorScheme.primaryContainer
             )
@@ -350,7 +350,7 @@ fun MessageBubble(message: SessionMessage) {
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Icon(
-                            if (isFromClaude) Icons.Default.SmartToy else Icons.Default.Person,
+                            if (isFromClaude) Icons.Default.Android else Icons.Default.Person,
                             contentDescription = null,
                             modifier = Modifier.size(14.dp),
                             tint = if (isFromClaude)
@@ -382,26 +382,25 @@ fun MessageBubble(message: SessionMessage) {
 
                 // Message content
                 Text(
-                    text = message.content,
+                    text = message.data.content,
                     style = MaterialTheme.typography.bodyMedium,
                     color = if (isFromClaude)
                         MaterialTheme.colorScheme.onSurfaceVariant
                     else
                         MaterialTheme.colorScheme.onPrimaryContainer,
-                    fontFamily = if (message.content.startsWith("```") || message.content.contains("```"))
+                    fontFamily = if (message.data.content.startsWith("```") || message.data.content.contains("```"))
                         FontFamily.Monospace else FontFamily.Default
                 )
 
                 // Show metadata if available (for historical messages)
-                message.metadata["historical"]?.let {
-                    if (it == "true") {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Row(
+                if (message.data.historical == true) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             Icon(
-                                Icons.Default.History,
+                                Icons.Default.Schedule,
                                 contentDescription = null,
                                 modifier = Modifier.size(12.dp),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
@@ -412,7 +411,6 @@ fun MessageBubble(message: SessionMessage) {
                                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                             )
                         }
-                    }
                 }
             }
         }

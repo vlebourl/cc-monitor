@@ -1,12 +1,14 @@
 package com.ccmonitor
 
 import android.util.Log
+import com.ccmonitor.data.SessionMessage
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.websocket.*
 import io.ktor.websocket.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -25,14 +27,6 @@ data class WebSocketMessage(
     val timestamp: String
 )
 
-@Serializable
-data class SessionMessage(
-    val sessionId: String,
-    val messageType: String,
-    val content: String,
-    val timestamp: String,
-    val metadata: Map<String, String> = emptyMap()
-)
 
 @Serializable
 data class SessionOccupiedInfo(
@@ -46,7 +40,7 @@ enum class ConnectionState {
 }
 
 class WebSocketManager(
-    private val serverUrl: String = "ws://localhost:8080",
+    private val serverUrl: String,
     private val maxRetryAttempts: Int = 10,
     private val baseDelay: Long = 1000, // 1 second base delay
     private val maxDelay: Long = 30000   // 30 seconds max delay
@@ -65,13 +59,13 @@ class WebSocketManager(
     val connectionState: StateFlow<ConnectionState> = _connectionState.asStateFlow()
 
     private val _messages = Channel<SessionMessage>(Channel.UNLIMITED)
-    private val messageFlow = _messages
+    private val messageFlow = _messages.receiveAsFlow()
 
     private val _errors = Channel<String>(Channel.UNLIMITED)
-    private val errorFlow = _errors
+    private val errorFlow = _errors.receiveAsFlow()
 
     private val _sessionOccupied = Channel<SessionOccupiedInfo>(Channel.UNLIMITED)
-    private val sessionOccupiedFlow = _sessionOccupied
+    private val sessionOccupiedFlow = _sessionOccupied.receiveAsFlow()
 
     private var retryCount = 0
     private var apiKey: String? = null
@@ -281,7 +275,7 @@ class WebSocketManager(
                         val reason = frame.readReason()
                         Log.i(tag, "WebSocket closed: ${reason?.message}")
 
-                        if (reason?.code == CloseReason.Codes.NORMAL) {
+                        if (reason?.code == CloseReason.Codes.NORMAL.code) {
                             _connectionState.value = ConnectionState.DISCONNECTED
                             return
                         } else {

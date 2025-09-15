@@ -8,14 +8,15 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.lifecycle.lifecycleScope
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.FlashOff
-import androidx.compose.material.icons.filled.FlashOn
+import androidx.compose.material.icons.filled.FlashlightOff
+import androidx.compose.material.icons.filled.FlashlightOn
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -133,7 +134,8 @@ class QRScanActivity : ComponentActivity() {
     private fun toggleFlash() {
         camera?.let { camera ->
             if (camera.cameraInfo.hasFlashUnit()) {
-                camera.cameraControl.enableTorch(!camera.cameraInfo.torchState.value!!)
+                val currentTorchState = camera.cameraInfo.torchState.value ?: false
+                camera.cameraControl.enableTorch(currentTorchState == false)
             }
         }
     }
@@ -173,7 +175,7 @@ fun QRScanScreen(
                         onFlashToggle()
                     }) {
                         Icon(
-                            if (isFlashOn) Icons.Default.FlashOn else Icons.Default.FlashOff,
+                            if (isFlashOn) Icons.Default.FlashlightOn else Icons.Default.FlashlightOff,
                             contentDescription = if (isFlashOn) "Turn off flash" else "Turn on flash"
                         )
                     }

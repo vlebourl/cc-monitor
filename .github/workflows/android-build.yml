@@ -1,0 +1,184 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch: # Allow manual builds
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      GRADLE_OPTS: '-Dorg.gradle.jvmargs="-Xmx4096m -XX:+HeapDumpOnOutOfMemoryError"'
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'adopt'
+
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
+
+    - name: Cache Gradle packages
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-
+
+    - name: Cache Android SDK
+      uses: actions/cache@v4
+      with:
+        path: |
+          ${{ env.ANDROID_SDK_ROOT }}
+        key: ${{ runner.os }}-android-sdk-${{ hashFiles('android/**/*.gradle*') }}
+        restore-keys: |
+          ${{ runner.os }}-android-sdk-
+
+    - name: Make gradlew executable
+      run: chmod +x android/gradlew
+
+    - name: Generate debug keystore
+      run: |
+        cd android/app
+        # Generate debug keystore if it doesn't exist
+        if [ ! -f debug.keystore ]; then
+          keytool -genkey -v -keystore debug.keystore \
+            -alias androiddebugkey \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass android -keypass android \
+            -dname "CN=Android Debug,O=Android,C=US"
+        fi
+
+    - name: Accept Android SDK licenses
+      run: yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses || true
+
+    - name: Build debug APK
+      run: |
+        cd android
+        ./gradlew assembleDebug --no-daemon --stacktrace
+      env:
+        ANDROID_HOME: ${{ env.ANDROID_SDK_ROOT }}
+
+    - name: Build release APK (unsigned)
+      run: |
+        cd android
+        ./gradlew assembleRelease --no-daemon --stacktrace
+      env:
+        ANDROID_HOME: ${{ env.ANDROID_SDK_ROOT }}
+
+    - name: Verify APK signing
+      run: |
+        echo "Verifying debug APK signing..."
+        jarsigner -verify android/app/build/outputs/apk/debug/app-debug.apk
+        echo "Debug APK is properly signed ✅"
+
+        echo "Checking APK details..."
+        ls -lh android/app/build/outputs/apk/debug/app-debug.apk
+        ls -lh android/app/build/outputs/apk/release/app-release-unsigned.apk
+
+    - name: Test APK installation (if emulator available)
+      run: |
+        # This would require setting up an emulator, which is complex in CI
+        # For now, we'll just verify the APK can be parsed
+        echo "Testing APK parsing..."
+        $ANDROID_SDK_ROOT/build-tools/*/aapt dump badging android/app/build/outputs/apk/debug/app-debug.apk | head -5
+
+    - name: Upload debug APK artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: claude-code-monitor-debug-${{ github.sha }}
+        path: android/app/build/outputs/apk/debug/app-debug.apk
+        retention-days: 30
+
+    - name: Upload release APK artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: claude-code-monitor-release-${{ github.sha }}
+        path: android/app/build/outputs/apk/release/app-release-unsigned.apk
+        retention-days: 30
+
+    - name: Create release comment (on main branch)
+      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      run: |
+        echo "📱 **Android APK Build Successful!**" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "✅ **Debug APK**: Ready for installation and testing" >> $GITHUB_STEP_SUMMARY
+        echo "✅ **Release APK**: Ready for distribution (unsigned)" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "📥 **Download Links**:" >> $GITHUB_STEP_SUMMARY
+        echo "- Debug APK: Check the 'Artifacts' section of this workflow run" >> $GITHUB_STEP_SUMMARY
+        echo "- Release APK: Check the 'Artifacts' section of this workflow run" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "🔧 **Installation Instructions**:" >> $GITHUB_STEP_SUMMARY
+        echo "1. Download the debug APK from GitHub Actions artifacts" >> $GITHUB_STEP_SUMMARY
+        echo "2. Enable 'Install from Unknown Sources' on your Android device" >> $GITHUB_STEP_SUMMARY
+        echo "3. Install the APK and open Claude Code Monitor" >> $GITHUB_STEP_SUMMARY
+        echo "4. Configure server settings and scan QR codes" >> $GITHUB_STEP_SUMMARY
+
+  # Optional: Add a job to create GitHub releases with APKs
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+    - name: Download debug APK
+      uses: actions/download-artifact@v4
+      with:
+        name: claude-code-monitor-debug-${{ github.sha }}
+        path: ./artifacts/
+
+    - name: Download release APK
+      uses: actions/download-artifact@v4
+      with:
+        name: claude-code-monitor-release-${{ github.sha }}
+        path: ./artifacts/
+
+    - name: Get commit info
+      id: commit
+      run: |
+        echo "short_sha=${GITHUB_SHA:0:7}" >> $GITHUB_OUTPUT
+        echo "commit_msg=$(git log -1 --pretty=%s)" >> $GITHUB_OUTPUT
+
+    - name: Create latest release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: "latest-build"
+        name: "Latest Build (${GITHUB_SHA:0:7})"
+        body: |
+          🚀 **Latest Claude Code Monitor Build**
+
+          **Commit**: ${{ steps.commit.outputs.commit_msg }}
+          **SHA**: ${{ github.sha }}
+          **Built**: ${{ github.event.head_commit.timestamp }}
+
+          📱 **Installation Instructions**:
+          1. Download `app-debug.apk` below
+          2. Enable "Install from Unknown Sources" on your Android device
+          3. Install the APK
+          4. Open Claude Code Monitor and configure your server
+
+          🔧 **Features**:
+          - ✅ Auto-discovery server connection
+          - ✅ QR code authentication
+          - ✅ Real-time session monitoring
+          - ✅ Offline message caching
+          - ✅ Settings management
+        prerelease: true
+        files: |
+          ./artifacts/app-debug.apk
+          ./artifacts/app-release-unsigned.apk
+        fail_on_unmatched_files: false

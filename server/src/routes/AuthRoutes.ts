@@ -16,6 +16,7 @@ export function createAuthRoutes(authService: AuthenticationService): Router {
         success: true,
         data: {
           qrCode: result.qrCode,
+          qrDataURL: result.qrDataURL,
           guestToken: result.guestToken,
           expiresIn: 30, // seconds
           instructions: 'Scan this QR code with your Android app within 30 seconds'

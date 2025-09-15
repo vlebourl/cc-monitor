@@ -4,12 +4,14 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.util.Log
 import com.ccmonitor.repository.MessageCacheRepository
+import com.ccmonitor.repository.SettingsRepository
+import com.ccmonitor.data.SessionMessage
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 
 class ConnectionHelper private constructor(
     private val context: Context,
-    private val serverUrl: String = "ws://localhost:8080"
+    private val customServerUrl: String? = null
 ) {
     private val tag = "ConnectionHelper"
 
@@ -17,6 +19,10 @@ class ConnectionHelper private constructor(
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
     private val messageCache = MessageCacheRepository.getInstance(context)
+    private val settingsRepository = SettingsRepository.getInstance(context)
+
+    private val serverUrl: String
+        get() = customServerUrl ?: settingsRepository.getServerUrl()
 
     private val preferences: SharedPreferences =
         context.getSharedPreferences("cc_monitor_prefs", Context.MODE_PRIVATE)
@@ -54,7 +60,7 @@ class ConnectionHelper private constructor(
         @Volatile
         private var INSTANCE: ConnectionHelper? = null
 
-        fun getInstance(context: Context, serverUrl: String = "ws://localhost:8080"): ConnectionHelper {
+        fun getInstance(context: Context, serverUrl: String? = null): ConnectionHelper {
             return INSTANCE ?: synchronized(this) {
                 INSTANCE ?: ConnectionHelper(context.applicationContext, serverUrl).also { INSTANCE = it }
             }

@@ -3,6 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
+import path from 'path';
 import { config } from 'dotenv';
 import { createServer } from 'http';
 import { WebSocketServer } from './services/WebSocketServer';
@@ -20,10 +21,15 @@ const PORT = Number(process.env.PORT) || 3000;
 const WS_PORT = Number(process.env.WS_PORT) || 8080;
 
 // Security and performance middleware
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: false, // Allow inline scripts for QR code generation
+}));
 app.use(cors());
 app.use(compression());
 app.use(express.json());
+
+// Serve static files from public directory
+app.use(express.static(path.join(__dirname, '../public')));
 
 // Create HTTP server
 const httpServer = createServer(app);
@@ -56,6 +62,25 @@ const connectionManager = new ConnectionManager(wsServer, fileMonitor);
 // Authentication routes
 app.use('/api/auth', createAuthRoutes(authService));
 
+// Version endpoint for compatibility checks
+app.get('/version', (req, res) => {
+  res.json({
+    version: '1.0.0',
+    apiVersion: '1.0',
+    protocolVersion: '1.0',
+    features: [
+      'websocket-connection',
+      'qr-authentication',
+      'message-display',
+      'session-monitoring',
+      'file-streaming',
+      'real-time-sync'
+    ],
+    minClientVersion: '1.0.0',
+    compatibilityLevel: 'stable'
+  });
+});
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({
@@ -70,16 +95,18 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Basic info route
-app.get('/', (req, res) => {
+// API info route (moved to /api to avoid conflict with static files)
+app.get('/api', (req, res) => {
   res.json({
     name: 'Claude Code Monitor Server',
     version: '1.0.0',
     description: 'Remote monitoring system for Claude Code sessions',
     endpoints: {
       health: '/health',
+      version: '/version',
       sessions: '/api/sessions',
-      websocket: `ws://localhost:${WS_PORT}`
+      websocket: `ws://localhost:${WS_PORT}`,
+      qrAuth: '/api/auth/qr'
     }
   });
 });
