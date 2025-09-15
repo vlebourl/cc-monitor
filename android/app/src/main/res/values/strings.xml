@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Claude Code Monitor</string>
+    <string name="scan_qr_code">Scan QR Code</string>
+    <string name="view_sessions">View Sessions</string>
+    <string name="session_list">Session List</string>
+    <string name="connection_status">Connection Status</string>
+    <string name="connected">Connected</string>
+    <string name="disconnected">Disconnected</string>
+    <string name="connecting">Connecting</string>
+    <string name="scan_qr_message">Point your camera at the QR code displayed on your server</string>
+    <string name="session_active">Active</string>
+    <string name="session_idle">Idle</string>
+    <string name="session_terminated">Terminated</string>
+    <string name="claude_working">Claude is working</string>
+    <string name="claude_waiting">Waiting for input</string>
+    <string name="no_sessions">No sessions found</string>
+    <string name="error_camera_permission">Camera permission is required for QR scanning</string>
+    <string name="error_connection_failed">Connection failed</string>
+    <string name="retry">Retry</string>
+</resources>

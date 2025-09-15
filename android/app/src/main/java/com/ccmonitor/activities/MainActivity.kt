@@ -1,0 +1,315 @@
+package com.ccmonitor.activities
+
+import android.content.Intent
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import com.ccmonitor.ui.theme.ClaudeCodeMonitorTheme
+import com.ccmonitor.ConnectionHelper
+import com.ccmonitor.AuthRepository
+import com.ccmonitor.ConnectionState
+import kotlinx.coroutines.launch
+
+class MainActivity : ComponentActivity() {
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        setContent {
+            ClaudeCodeMonitorTheme {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    MainScreen()
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun MainScreen() {
+    val context = LocalContext.current
+    val connectionHelper = remember { ConnectionHelper.getInstance(context) }
+    val authRepository = remember { AuthRepository.getInstance(context) }
+    val scope = rememberCoroutineScope()
+
+    // Observe connection state
+    val connectionState by connectionHelper.connectionState.collectAsState()
+    val currentSession by connectionHelper.currentSession.collectAsState()
+    val errors by connectionHelper.errors.collectAsState(initial = "")
+
+    // Check for existing credentials on startup
+    var hasCredentials by remember { mutableStateOf(false) }
+    var isCheckingCredentials by remember { mutableStateOf(true) }
+
+    LaunchedEffect(Unit) {
+        hasCredentials = authRepository.hasValidCredentials()
+
+        if (hasCredentials) {
+            // Try to validate and auto-connect
+            val validationResult = authRepository.validateStoredCredentials()
+            validationResult.fold(
+                onSuccess = { isValid ->
+                    if (isValid) {
+                        val apiKey = authRepository.getApiKey()
+                        if (apiKey != null) {
+                            connectionHelper.connect(apiKey)
+                        }
+                    } else {
+                        authRepository.clearStoredCredentials()
+                        hasCredentials = false
+                    }
+                },
+                onFailure = {
+                    authRepository.clearStoredCredentials()
+                    hasCredentials = false
+                }
+            )
+        }
+
+        isCheckingCredentials = false
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Claude Code Monitor") },
+                actions = {
+                    IconButton(onClick = {
+                        // TODO: Open settings
+                    }) {
+                        Icon(Icons.Default.Settings, contentDescription = "Settings")
+                    }
+                }
+            )
+        }
+    ) { paddingValues ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .padding(16.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            if (isCheckingCredentials) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    CircularProgressIndicator()
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("Checking credentials...")
+                }
+            } else {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // Connection status card
+                    Card(
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = "Connection Status",
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            val statusColor = when (connectionState) {
+                                ConnectionState.CONNECTED -> MaterialTheme.colorScheme.primary
+                                ConnectionState.CONNECTING, ConnectionState.RECONNECTING -> MaterialTheme.colorScheme.secondary
+                                ConnectionState.FAILED -> MaterialTheme.colorScheme.error
+                                ConnectionState.DISCONNECTED -> MaterialTheme.colorScheme.outline
+                            }
+
+                            Text(
+                                text = connectionState.name.replace("_", " "),
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = statusColor
+                            )
+
+                            if (currentSession != null) {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "Session: ${currentSession!!.take(8)}...",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+
+                    // Error display
+                    if (errors.isNotEmpty()) {
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.errorContainer
+                            )
+                        ) {
+                            Text(
+                                text = errors,
+                                modifier = Modifier.padding(16.dp),
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(32.dp))
+
+                    if (!hasCredentials) {
+                        // Authentication needed
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            Text(
+                                text = "Welcome to Claude Code Monitor",
+                                style = MaterialTheme.typography.headlineSmall,
+                                textAlign = TextAlign.Center
+                            )
+
+                            Text(
+                                text = "To get started, scan a QR code from your desktop to pair this device.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                textAlign = TextAlign.Center
+                            )
+
+                            Button(
+                                onClick = {
+                                    val intent = Intent(context, QRScanActivity::class.java)
+                                    context.startActivity(intent)
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Default.QrCodeScanner, contentDescription = null)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Scan QR Code")
+                            }
+                        }
+                    } else {
+                        // Has credentials - show main actions
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            if (connectionState == ConnectionState.CONNECTED) {
+                                Button(
+                                    onClick = {
+                                        val intent = Intent(context, SessionListActivity::class.java)
+                                        context.startActivity(intent)
+                                    },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text("Browse Sessions")
+                                }
+
+                                if (currentSession != null) {
+                                    OutlinedButton(
+                                        onClick = {
+                                            val intent = Intent(context, MessageDisplayActivity::class.java).apply {
+                                                putExtra("sessionId", currentSession)
+                                            }
+                                            context.startActivity(intent)
+                                        },
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text("Current Session")
+                                    }
+                                }
+                            } else {
+                                Button(
+                                    onClick = {
+                                        scope.launch {
+                                            connectionHelper.reconnect()
+                                        }
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    enabled = connectionState != ConnectionState.CONNECTING && connectionState != ConnectionState.RECONNECTING
+                                ) {
+                                    if (connectionState == ConnectionState.CONNECTING || connectionState == ConnectionState.RECONNECTING) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(16.dp),
+                                            strokeWidth = 2.dp
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                    }
+                                    Text("Connect")
+                                }
+                            }
+
+                            OutlinedButton(
+                                onClick = {
+                                    val intent = Intent(context, QRScanActivity::class.java)
+                                    context.startActivity(intent)
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Default.QrCodeScanner, contentDescription = null)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Scan New QR Code")
+                            }
+
+                            // Advanced options
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                OutlinedButton(
+                                    onClick = {
+                                        scope.launch {
+                                            authRepository.clearStoredCredentials()
+                                            connectionHelper.disconnect()
+                                            hasCredentials = false
+                                        }
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text("Sign Out")
+                                }
+
+                                OutlinedButton(
+                                    onClick = {
+                                        scope.launch {
+                                            val result = authRepository.refreshApiKey()
+                                            result.fold(
+                                                onSuccess = {
+                                                    // Reconnect with new key
+                                                    connectionHelper.reconnect()
+                                                },
+                                                onFailure = {
+                                                    // Handle refresh failure
+                                                }
+                                            )
+                                        }
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text("Refresh")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

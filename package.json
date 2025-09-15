@@ -1,0 +1,54 @@
+{
+  "name": "claude-code-monitor",
+  "version": "1.0.0",
+  "description": "Remote monitoring system for Claude Code sessions with Android client",
+  "private": true,
+  "workspaces": [
+    "server",
+    "shared"
+  ],
+  "scripts": {
+    "build": "npm run build:server && npm run build:shared",
+    "build:server": "cd server && npm run build",
+    "build:shared": "cd shared && npm run build",
+    "test": "npm run test:server && npm run test:shared",
+    "test:server": "cd server && npm test",
+    "test:shared": "cd shared && npm test",
+    "dev": "npm run dev:server",
+    "dev:server": "cd server && npm run dev",
+    "lint": "npm run lint:server && npm run lint:shared",
+    "lint:server": "cd server && npm run lint",
+    "lint:shared": "cd shared && npm run lint",
+    "install:android": "cd android && ./gradlew build",
+    "clean": "npm run clean:server && npm run clean:shared && npm run clean:android",
+    "clean:server": "cd server && rm -rf dist node_modules",
+    "clean:shared": "cd shared && rm -rf dist node_modules",
+    "clean:android": "cd android && ./gradlew clean"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/anthropics/claude-code-monitor.git"
+  },
+  "keywords": [
+    "claude-code",
+    "monitoring",
+    "remote",
+    "android",
+    "websocket",
+    "development"
+  ],
+  "author": "Claude Code AI",
+  "license": "MIT",
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^6.7.5",
+    "@typescript-eslint/parser": "^6.7.5",
+    "eslint": "^8.51.0",
+    "eslint-config-prettier": "^9.0.0",
+    "eslint-plugin-prettier": "^5.0.0",
+    "prettier": "^3.0.3"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}
