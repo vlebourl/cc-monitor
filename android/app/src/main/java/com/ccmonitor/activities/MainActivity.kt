@@ -508,13 +508,20 @@ fun MainScreen() {
 // Helper function to extract QR data from pasted token
 private fun extractQRDataFromToken(token: String): QRScanActivity.QRData? {
     return try {
-        val url = java.net.URL(token)
-        val query = url.query ?: return null
+        // Handle both URL format and direct query string format
+        val queryString = if (token.startsWith("http")) {
+            // URL format: https://server.com/auth?token=xyz
+            val url = java.net.URL(token)
+            url.query ?: return null
+        } else {
+            // Query string format: token=xyz&serverUrl=...&wsUrl=...
+            token
+        }
 
-        val params = query.split("&").mapNotNull { param ->
+        val params = queryString.split("&").mapNotNull { param ->
             val parts = param.split("=", limit = 2)
             if (parts.size == 2) {
-                parts[0] to parts[1]
+                parts[0] to java.net.URLDecoder.decode(parts[1], "UTF-8")
             } else {
                 null
             }
@@ -522,11 +529,19 @@ private fun extractQRDataFromToken(token: String): QRScanActivity.QRData? {
 
         val guestToken = params["token"] ?: return null
 
-        // Extract base server URL (remove path and query)
-        val serverUrl = "${url.protocol}://${url.host}${if (url.port != -1 && url.port != 80 && url.port != 443) ":${url.port}" else ""}"
+        val serverUrl: String
+        val wsUrl: String
 
-        // Convert HTTP URL to WebSocket URL
-        val wsUrl = serverUrl.replace("https://", "wss://").replace("http://", "ws://")
+        if (params.containsKey("serverUrl") && params.containsKey("wsUrl")) {
+            // Direct format with explicit URLs
+            serverUrl = params["serverUrl"]!!
+            wsUrl = params["wsUrl"]!!
+        } else {
+            // URL format - extract from the original URL
+            val url = java.net.URL(token)
+            serverUrl = "${url.protocol}://${url.host}${if (url.port != -1 && url.port != 80 && url.port != 443) ":${url.port}" else ""}"
+            wsUrl = serverUrl.replace("https://", "wss://").replace("http://", "ws://")
+        }
 
         QRScanActivity.QRData(
             serverUrl = serverUrl,
@@ -534,6 +549,7 @@ private fun extractQRDataFromToken(token: String): QRScanActivity.QRData? {
             guestToken = guestToken
         )
     } catch (e: Exception) {
+        android.util.Log.e("MainActivity", "Failed to parse configuration token", e)
         null
     }
 }
