@@ -5,9 +5,11 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -86,8 +88,9 @@ fun MainScreen() {
         isCheckingCredentials = false
     }
 
-    // State for info dialog
+    // State for info dialog and manual setup
     var showInfoDialog by remember { mutableStateOf(false) }
+    var showManualSetupDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -206,6 +209,15 @@ fun MainScreen() {
                                 Icon(Icons.Default.QrCode, contentDescription = null)
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text("Scan QR Code")
+                            }
+
+                            OutlinedButton(
+                                onClick = { showManualSetupDialog = true },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Default.Edit, contentDescription = null)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Manual Setup")
                             }
                         }
                     } else {
@@ -394,5 +406,134 @@ fun MainScreen() {
                 }
             )
         }
+
+        // Manual Setup Dialog
+        if (showManualSetupDialog) {
+            var configToken by remember { mutableStateOf("") }
+            var isProcessing by remember { mutableStateOf(false) }
+
+            AlertDialog(
+                onDismissRequest = { showManualSetupDialog = false },
+                title = { Text("Manual Setup") },
+                text = {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            text = "Paste the configuration token from your server web page:",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+
+                        OutlinedTextField(
+                            value = configToken,
+                            onValueChange = { configToken = it },
+                            label = { Text("Configuration Token") },
+                            placeholder = { Text("https://your-server.com/auth?token=...") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = false,
+                            maxLines = 3,
+                            keyboardOptions = KeyboardOptions.Default
+                        )
+
+                        if (isProcessing) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp))
+                                Text("Configuring...", style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            if (configToken.isNotBlank() && !isProcessing) {
+                                scope.launch {
+                                    isProcessing = true
+                                    try {
+                                        // Extract QR data from the pasted token
+                                        val qrData = extractQRDataFromToken(configToken.trim())
+                                        if (qrData != null) {
+                                            // Same logic as QR scan
+                                            val deviceId = android.provider.Settings.Secure.getString(
+                                                context.contentResolver,
+                                                android.provider.Settings.Secure.ANDROID_ID
+                                            )
+
+                                            settingsRepository.saveServerUrl(qrData.wsUrl)
+
+                                            val authRepository = AuthRepository.getInstance(context, qrData.serverUrl)
+                                            val connectionHelper = ConnectionHelper.getInstance(context, qrData.wsUrl)
+
+                                            val result = authRepository.authenticateWithQRToken(qrData.guestToken, deviceId)
+                                            result.fold(
+                                                onSuccess = { authData ->
+                                                    connectionHelper.connect(authData.apiKey)
+                                                    hasCredentials = true
+                                                    showManualSetupDialog = false
+                                                },
+                                                onFailure = { error ->
+                                                    // Keep dialog open, show error
+                                                }
+                                            )
+                                        }
+                                    } catch (e: Exception) {
+                                        // Keep dialog open, show error
+                                    } finally {
+                                        isProcessing = false
+                                    }
+                                }
+                            }
+                        },
+                        enabled = configToken.isNotBlank() && !isProcessing
+                    ) {
+                        Text("Configure")
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = { showManualSetupDialog = false },
+                        enabled = !isProcessing
+                    ) {
+                        Text("Cancel")
+                    }
+                }
+            )
+        }
+    }
+}
+
+// Helper function to extract QR data from pasted token
+private fun extractQRDataFromToken(token: String): QRScanActivity.QRData? {
+    return try {
+        val url = java.net.URL(token)
+        val query = url.query ?: return null
+
+        val params = query.split("&").mapNotNull { param ->
+            val parts = param.split("=", limit = 2)
+            if (parts.size == 2) {
+                parts[0] to parts[1]
+            } else {
+                null
+            }
+        }.toMap()
+
+        val guestToken = params["token"] ?: return null
+
+        // Extract base server URL (remove path and query)
+        val serverUrl = "${url.protocol}://${url.host}${if (url.port != -1 && url.port != 80 && url.port != 443) ":${url.port}" else ""}"
+
+        // Convert HTTP URL to WebSocket URL
+        val wsUrl = serverUrl.replace("https://", "wss://").replace("http://", "ws://")
+
+        QRScanActivity.QRData(
+            serverUrl = serverUrl,
+            wsUrl = wsUrl,
+            guestToken = guestToken
+        )
+    } catch (e: Exception) {
+        null
     }
 }

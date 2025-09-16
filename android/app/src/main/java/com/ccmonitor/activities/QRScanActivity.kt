@@ -95,7 +95,7 @@ class QRScanActivity : ComponentActivity() {
                 try {
                     // Auto-configure server settings from QR code
                     val settingsRepository = SettingsRepository.getInstance(this@QRScanActivity)
-                    settingsRepository.saveServerUrl(qrData.serverUrl)
+                    settingsRepository.saveServerUrl(qrData.wsUrl) // Save WebSocket URL, not HTTP URL
 
                     Toast.makeText(this@QRScanActivity, "Server configured: ${qrData.serverUrl}", Toast.LENGTH_SHORT).show()
 
@@ -137,12 +137,23 @@ class QRScanActivity : ComponentActivity() {
     private fun extractQRData(qrContent: String): QRData? {
         // Parse URL and extract server info and token parameter
         return try {
+            println("QR Content: $qrContent") // Debug log
+
             val url = java.net.URL(qrContent)
             val query = url.query ?: return null
-            val params = query.split("&").associate { param ->
-                val (key, value) = param.split("=")
-                key to value
-            }
+
+            println("Query: $query") // Debug log
+
+            val params = query.split("&").mapNotNull { param ->
+                val parts = param.split("=", limit = 2)
+                if (parts.size == 2) {
+                    parts[0] to parts[1]
+                } else {
+                    null
+                }
+            }.toMap()
+
+            println("Params: $params") // Debug log
 
             val guestToken = params["token"] ?: return null
 
@@ -154,12 +165,17 @@ class QRScanActivity : ComponentActivity() {
             // the WebSocket uses the same URL as HTTP, just with ws/wss protocol
             val wsUrl = serverUrl.replace("https://", "wss://").replace("http://", "ws://")
 
+            println("Server URL: $serverUrl") // Debug log
+            println("WebSocket URL: $wsUrl") // Debug log
+
             QRData(
                 serverUrl = serverUrl,
                 wsUrl = wsUrl,
                 guestToken = guestToken
             )
         } catch (e: Exception) {
+            println("QR parsing error: ${e.message}") // Debug log
+            e.printStackTrace()
             null
         }
     }

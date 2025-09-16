@@ -215,6 +215,22 @@
             <div style="background: #e8f5e8; border: 1px solid #4caf50; border-radius: 5px; padding: 10px; margin-top: 15px;">
                 <strong>🎉 New Feature:</strong> QR codes now automatically configure server settings - no manual setup required!
             </div>
+
+            <div style="background: #f0f7ff; border: 1px solid #2196f3; border-radius: 5px; padding: 10px; margin-top: 15px;">
+                <strong>📋 Alternative: Manual Configuration</strong><br>
+                <small>For testing on emulators or same-device usage, copy this configuration token:</small><br>
+                <div style="background: #ffffff; border: 1px solid #ddd; border-radius: 3px; padding: 8px; margin: 8px 0; font-family: monospace; word-break: break-all; position: relative;" id="configToken">
+                    Loading...
+                </div>
+                <button
+                    id="copyTokenBtn"
+                    onclick="copyConfigToken()"
+                    style="background: #2196f3; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer; font-size: 14px; margin-top: 5px;"
+                    disabled>
+                    📋 Copy Token
+                </button>
+                <br><small>Use "Manual Setup" in the app and paste this token</small>
+            </div>
         </div>
 
         <div class="server-info">
@@ -308,6 +324,11 @@
                 refreshBtn.disabled = false;
                 currentToken = data.data.guestToken;
 
+                // Update configuration token display
+                const configToken = `${window.location.origin}/auth?token=${data.data.guestToken}`;
+                document.getElementById('configToken').textContent = configToken;
+                document.getElementById('copyTokenBtn').disabled = false;
+
                 // Start countdown timer
                 let timeLeft = data.data.expiresIn || 30;
                 timerEl.style.display = 'block';
@@ -321,6 +342,7 @@
                         timerEl.textContent = 'QR code expired';
                         statusEl.className = 'status error';
                         statusEl.innerHTML = '⏰ QR code expired - Generate a new one';
+                        document.getElementById('copyTokenBtn').disabled = true;
                         clearInterval(countdownTimer);
                     }
                 }, 1000);
@@ -353,6 +375,53 @@
 
         // Auto-check server status every 30 seconds
         setInterval(checkServerStatus, 30000);
+
+        // Copy configuration token to clipboard
+        function copyConfigToken() {
+            const tokenElement = document.getElementById('configToken');
+            const tokenText = tokenElement.textContent;
+
+            if (navigator.clipboard && window.isSecureContext) {
+                // Use modern clipboard API
+                navigator.clipboard.writeText(tokenText).then(() => {
+                    const button = document.getElementById('copyTokenBtn');
+                    const originalText = button.textContent;
+                    button.textContent = '✅ Copied!';
+                    button.style.background = '#4caf50';
+                    setTimeout(() => {
+                        button.textContent = originalText;
+                        button.style.background = '#2196f3';
+                    }, 2000);
+                }).catch(err => {
+                    console.error('Failed to copy: ', err);
+                    fallbackCopy(tokenText);
+                });
+            } else {
+                // Fallback for older browsers
+                fallbackCopy(tokenText);
+            }
+        }
+
+        function fallbackCopy(text) {
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            document.body.appendChild(textarea);
+            textarea.select();
+            try {
+                document.execCommand('copy');
+                const button = document.getElementById('copyTokenBtn');
+                const originalText = button.textContent;
+                button.textContent = '✅ Copied!';
+                button.style.background = '#4caf50';
+                setTimeout(() => {
+                    button.textContent = originalText;
+                    button.style.background = '#2196f3';
+                }, 2000);
+            } catch (err) {
+                console.error('Fallback copy failed: ', err);
+            }
+            document.body.removeChild(textarea);
+        }
     </script>
 </body>
 </html>
