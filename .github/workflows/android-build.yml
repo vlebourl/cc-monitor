@@ -159,33 +159,37 @@ jobs:
       run: |
         echo "short_sha=${GITHUB_SHA:0:7}" >> $GITHUB_OUTPUT
         echo "commit_msg=$(git log -1 --pretty=%s)" >> $GITHUB_OUTPUT
+        echo "timestamp=$(date +'%Y%m%d-%H%M%S')" >> $GITHUB_OUTPUT
+        echo "version=v1.0.0-build.${{ github.run_number }}" >> $GITHUB_OUTPUT
 
-    - name: Create latest release
+    - name: Create build release
       uses: softprops/action-gh-release@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: "latest-build"
-        name: "Latest Build (${{ steps.commit.outputs.short_sha }})"
+        tag_name: "${{ steps.commit.outputs.version }}"
+        name: "Build ${{ github.run_number }} (${{ steps.commit.outputs.short_sha }})"
         body: |
-          🚀 **Latest Claude Code Monitor Build**
+          🚀 **Claude Code Monitor Build ${{ github.run_number }}**
 
+          **Version**: ${{ steps.commit.outputs.version }}
           **Commit**: ${{ steps.commit.outputs.commit_msg }}
-          **SHA**: ${{ github.sha }}
-          **Built**: ${{ github.event.head_commit.timestamp }}
+          **SHA**: ${{ steps.commit.outputs.short_sha }}
+          **Built**: ${{ steps.commit.outputs.timestamp }}
+          **Workflow**: [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
 
           📱 **Installation Instructions**:
           1. Download `app-debug.apk` below
           2. Enable "Install from Unknown Sources" on your Android device
-          3. Install the APK
-          4. Open Claude Code Monitor and configure your server
+          3. Install the APK - **QR scanning now auto-configures server!**
+          4. Scan QR code from your server to connect
 
-          🔧 **Features**:
+          ✨ **Latest Features**:
+          - ✅ **QR Auto-Configuration** - scan once, connect automatically!
           - ✅ Auto-discovery server connection
-          - ✅ QR code authentication
           - ✅ Real-time session monitoring
           - ✅ Offline message caching
-          - ✅ Settings management
+          - ✅ Reverse proxy support (HTTPS/WSS)
         prerelease: true
         files: |
           ./artifacts/*.apk
