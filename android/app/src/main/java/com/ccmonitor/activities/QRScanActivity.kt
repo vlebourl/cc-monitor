@@ -30,6 +30,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
 import com.ccmonitor.AuthRepository
 import com.ccmonitor.ConnectionHelper
+import com.ccmonitor.repository.SettingsRepository
 import com.ccmonitor.ui.theme.ClaudeCodeMonitorTheme
 import com.google.mlkit.vision.barcode.BarcodeScanner
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
@@ -83,41 +84,58 @@ class QRScanActivity : ComponentActivity() {
     }
 
     private fun handleQRScanned(qrContent: String) {
-        // Extract guest token from QR content
-        // Expected format: http://localhost:3000/auth?token=<guest-token>
-        val guestToken = extractGuestToken(qrContent)
+        // Extract both server URL and guest token from QR content
+        // Expected format: https://cc-monitor.tiarkaerell.com/auth?token=<guest-token>
+        val qrData = extractQRData(qrContent)
 
-        if (guestToken != null) {
+        if (qrData != null) {
             val deviceId = Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID)
 
-            // Authenticate with the server
-            val authRepository = AuthRepository.getInstance(this)
-            val connectionHelper = ConnectionHelper.getInstance(this)
-
             lifecycleScope.launch {
-                val result = authRepository.authenticateWithQRToken(guestToken, deviceId)
-                result.fold(
-                    onSuccess = { authData ->
-                        Toast.makeText(this@QRScanActivity, "Authentication successful!", Toast.LENGTH_SHORT).show()
+                try {
+                    // Auto-configure server settings from QR code
+                    val settingsRepository = SettingsRepository.getInstance(this@QRScanActivity)
+                    settingsRepository.saveServerUrl(qrData.serverUrl)
 
-                        // Connect to WebSocket
-                        connectionHelper.connect(authData.apiKey)
+                    Toast.makeText(this@QRScanActivity, "Server configured: ${qrData.serverUrl}", Toast.LENGTH_SHORT).show()
 
-                        // Close this activity and return to main
-                        finish()
-                    },
-                    onFailure = { error ->
-                        Toast.makeText(this@QRScanActivity, "Authentication failed: ${error.message}", Toast.LENGTH_LONG).show()
-                    }
-                )
+                    // Create instances with the correct server URL
+                    val authRepository = AuthRepository.getInstance(this@QRScanActivity, qrData.serverUrl)
+                    val connectionHelper = ConnectionHelper.getInstance(this@QRScanActivity, qrData.wsUrl)
+
+                    // Authenticate with the server
+                    val result = authRepository.authenticateWithQRToken(qrData.guestToken, deviceId)
+                    result.fold(
+                        onSuccess = { authData ->
+                            Toast.makeText(this@QRScanActivity, "Authentication successful!", Toast.LENGTH_SHORT).show()
+
+                            // Connect to WebSocket with correct URL
+                            connectionHelper.connect(authData.apiKey)
+
+                            // Close this activity and return to main
+                            finish()
+                        },
+                        onFailure = { error ->
+                            Toast.makeText(this@QRScanActivity, "Authentication failed: ${error.message}", Toast.LENGTH_LONG).show()
+                        }
+                    )
+                } catch (e: Exception) {
+                    Toast.makeText(this@QRScanActivity, "Configuration failed: ${e.message}", Toast.LENGTH_LONG).show()
+                }
             }
         } else {
             Toast.makeText(this, "Invalid QR code format", Toast.LENGTH_SHORT).show()
         }
     }
 
-    private fun extractGuestToken(qrContent: String): String? {
-        // Parse URL and extract token parameter
+    data class QRData(
+        val serverUrl: String,
+        val wsUrl: String,
+        val guestToken: String
+    )
+
+    private fun extractQRData(qrContent: String): QRData? {
+        // Parse URL and extract server info and token parameter
         return try {
             val url = java.net.URL(qrContent)
             val query = url.query ?: return null
@@ -125,10 +143,28 @@ class QRScanActivity : ComponentActivity() {
                 val (key, value) = param.split("=")
                 key to value
             }
-            params["token"]
+
+            val guestToken = params["token"] ?: return null
+
+            // Extract base server URL (remove path and query)
+            val serverUrl = "${url.protocol}://${url.host}${if (url.port != -1 && url.port != 80 && url.port != 443) ":${url.port}" else ""}"
+
+            // Convert HTTP URL to WebSocket URL
+            val wsUrl = serverUrl.replace("https://", "wss://").replace("http://", "ws://")
+
+            QRData(
+                serverUrl = serverUrl,
+                wsUrl = wsUrl,
+                guestToken = guestToken
+            )
         } catch (e: Exception) {
             null
         }
+    }
+
+    // Legacy function for compatibility
+    private fun extractGuestToken(qrContent: String): String? {
+        return extractQRData(qrContent)?.guestToken
     }
 
     private fun toggleFlash() {

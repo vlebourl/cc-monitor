@@ -20,6 +20,16 @@ const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 const WS_PORT = Number(process.env.WS_PORT) || 8080;
 
+// Public URL configuration for reverse proxy support
+const PUBLIC_URL = process.env.PUBLIC_URL || `http://localhost:${PORT}`;
+const PUBLIC_WS_URL = process.env.PUBLIC_WS_URL || `ws://localhost:${WS_PORT}`;
+
+console.log('🌐 Server Configuration:');
+console.log(`  Internal HTTP: http://localhost:${PORT}`);
+console.log(`  Internal WebSocket: ws://localhost:${WS_PORT}`);
+console.log(`  Public URL: ${PUBLIC_URL}`);
+console.log(`  Public WebSocket: ${PUBLIC_WS_URL}`);
+
 // Security and performance middleware
 app.use(helmet({
   contentSecurityPolicy: false, // Allow inline scripts for QR code generation
@@ -41,7 +51,7 @@ const fileMonitor = new FileStreamMonitor({
 });
 
 const authService = new AuthenticationService({
-  baseUrl: process.env.BASE_URL || `http://localhost:${PORT}`,
+  baseUrl: PUBLIC_URL,
   qrTokenTTL: Number(process.env.QR_TOKEN_TTL) || 30000,
   apiKeyTTL: Number(process.env.API_KEY_TTL) || 30 * 24 * 60 * 60 * 1000
 });
@@ -105,7 +115,7 @@ app.get('/api', (req, res) => {
       health: '/health',
       version: '/version',
       sessions: '/api/sessions',
-      websocket: `ws://localhost:${WS_PORT}`,
+      websocket: PUBLIC_WS_URL,
       qrAuth: '/api/auth/qr'
     }
   });
@@ -139,7 +149,7 @@ app.get('/api/sessions', requireAuth(authService), (req, res) => {
 // WebSocket connection info
 app.get('/api/websocket', (req, res) => {
   res.json({
-    url: `ws://localhost:${WS_PORT}`,
+    url: PUBLIC_WS_URL,
     status: wsServer.isRunning() ? 'running' : 'stopped',
     stats: wsServer.getStats(),
     protocol: 'Claude Code Monitor Protocol v1.0'
@@ -203,9 +213,11 @@ async function startServer() {
       console.log(`✓ HTTP server started on port ${PORT}`);
       console.log('');
       console.log('Services running:');
-      console.log(`  HTTP API: http://localhost:${PORT}`);
-      console.log(`  WebSocket: ws://localhost:${WS_PORT}`);
-      console.log(`  Health Check: http://localhost:${PORT}/health`);
+      console.log(`  HTTP API (internal): http://localhost:${PORT}`);
+      console.log(`  HTTP API (public): ${PUBLIC_URL}`);
+      console.log(`  WebSocket (internal): ws://localhost:${WS_PORT}`);
+      console.log(`  WebSocket (public): ${PUBLIC_WS_URL}`);
+      console.log(`  Health Check: ${PUBLIC_URL}/health`);
       console.log('');
       console.log('Ready to monitor Claude Code sessions! 🚀');
     });
