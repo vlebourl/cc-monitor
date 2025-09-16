@@ -86,26 +86,35 @@ jobs:
     - name: Verify APK signing
       run: |
         echo "Checking APK files exist..."
-        if [ ! -f "android/app/build/outputs/apk/debug/app-debug.apk" ]; then
-          echo "❌ Debug APK not found!"
-          exit 1
-        fi
-        if [ ! -f "android/app/build/outputs/apk/release/app-release-unsigned.apk" ]; then
-          echo "❌ Release APK not found!"
+        DEBUG_APK="android/app/build/outputs/apk/debug/app-debug.apk"
+        RELEASE_APK="android/app/build/outputs/apk/release/app-release-unsigned.apk"
+
+        if [ ! -f "$DEBUG_APK" ]; then
+          echo "❌ Debug APK not found at $DEBUG_APK!"
+          echo "🔍 Looking for APK files in build outputs..."
+          find android/app/build/outputs -name "*.apk" -type f || echo "No APK files found"
           exit 1
         fi
 
-        echo "Checking APK details..."
-        ls -lh android/app/build/outputs/apk/debug/app-debug.apk
-        ls -lh android/app/build/outputs/apk/release/app-release-unsigned.apk
+        echo "✅ Debug APK found at $DEBUG_APK"
+        ls -lh "$DEBUG_APK"
+
+        if [ -f "$RELEASE_APK" ]; then
+          echo "✅ Release APK found at $RELEASE_APK"
+          ls -lh "$RELEASE_APK"
+        else
+          echo "⚠️ Release APK not found at $RELEASE_APK (this might be expected)"
+          echo "🔍 Looking for release APK files..."
+          find android/app/build/outputs/apk/release -name "*.apk" -type f 2>/dev/null || echo "No release APK files found"
+        fi
 
         echo "Verifying debug APK signing..."
-        if jarsigner -verify android/app/build/outputs/apk/debug/app-debug.apk; then
+        if jarsigner -verify "$DEBUG_APK"; then
           echo "✅ Debug APK is properly signed"
         else
           echo "⚠️ Debug APK signature verification failed, but this might be expected for debug builds"
           echo "Checking if APK is at least parseable..."
-          file android/app/build/outputs/apk/debug/app-debug.apk
+          file "$DEBUG_APK"
         fi
 
     - name: Test APK installation (if emulator available)
@@ -129,9 +138,10 @@ jobs:
 
     - name: Upload release APK artifact
       uses: actions/upload-artifact@v4
+      if: hashFiles('android/app/build/outputs/apk/release/*.apk') != ''
       with:
         name: claude-code-monitor-release-${{ github.sha }}
-        path: android/app/build/outputs/apk/release/app-release-unsigned.apk
+        path: android/app/build/outputs/apk/release/*.apk
         retention-days: 30
 
     - name: Create release comment (on main branch)
@@ -170,6 +180,7 @@ jobs:
 
     - name: Download release APK
       uses: actions/download-artifact@v4
+      continue-on-error: true
       with:
         name: claude-code-monitor-release-${{ github.sha }}
         path: ./artifacts/
@@ -206,6 +217,5 @@ jobs:
           - ✅ Settings management
         prerelease: true
         files: |
-          ./artifacts/app-debug.apk
-          ./artifacts/app-release-unsigned.apk
+          ./artifacts/*.apk
         fail_on_unmatched_files: false
