@@ -160,7 +160,9 @@ jobs:
         echo "short_sha=${GITHUB_SHA:0:7}" >> $GITHUB_OUTPUT
         echo "commit_msg=$(git log -1 --pretty=%s)" >> $GITHUB_OUTPUT
         echo "timestamp=$(date +'%Y%m%d-%H%M%S')" >> $GITHUB_OUTPUT
-        echo "version=v1.0.0-build.${{ github.run_number }}" >> $GITHUB_OUTPUT
+        VERSION=$(cat VERSION)
+        echo "version=v${VERSION}-build.${{ github.run_number }}" >> $GITHUB_OUTPUT
+        echo "app_version=${VERSION}" >> $GITHUB_OUTPUT
 
     - name: Create build release
       uses: softprops/action-gh-release@v1
@@ -172,7 +174,8 @@ jobs:
         body: |
           🚀 **Claude Code Monitor Build ${{ github.run_number }}**
 
-          **Version**: ${{ steps.commit.outputs.version }}
+          **App Version**: ${{ steps.commit.outputs.app_version }}
+          **Build**: ${{ steps.commit.outputs.version }}
           **Commit**: ${{ steps.commit.outputs.commit_msg }}
           **SHA**: ${{ steps.commit.outputs.short_sha }}
           **Built**: ${{ steps.commit.outputs.timestamp }}
