@@ -1,6 +1,6 @@
 {
   "name": "@cc-monitor/server",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Server component for Claude Code monitoring system",
   "main": "dist/index.js",
   "scripts": {
