@@ -7,7 +7,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.QrCode
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -19,6 +19,7 @@ import com.ccmonitor.ui.theme.ClaudeCodeMonitorTheme
 import com.ccmonitor.ConnectionHelper
 import com.ccmonitor.AuthRepository
 import com.ccmonitor.ConnectionState
+import com.ccmonitor.repository.SettingsRepository
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -45,6 +46,7 @@ fun MainScreen() {
     val context = LocalContext.current
     val connectionHelper = remember { ConnectionHelper.getInstance(context) }
     val authRepository = remember { AuthRepository.getInstance(context) }
+    val settingsRepository = remember { SettingsRepository.getInstance(context) }
     val scope = rememberCoroutineScope()
 
     // Observe connection state
@@ -84,16 +86,16 @@ fun MainScreen() {
         isCheckingCredentials = false
     }
 
+    // State for info dialog
+    var showInfoDialog by remember { mutableStateOf(false) }
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Claude Code Monitor") },
                 actions = {
-                    IconButton(onClick = {
-                        val intent = Intent(context, SettingsActivity::class.java)
-                        context.startActivity(intent)
-                    }) {
-                        Icon(Icons.Default.Settings, contentDescription = "Settings")
+                    IconButton(onClick = { showInfoDialog = true }) {
+                        Icon(Icons.Default.Info, contentDescription = "Server Info")
                     }
                 }
             )
@@ -311,6 +313,86 @@ fun MainScreen() {
                     }
                 }
             }
+        }
+
+        // Server Info Dialog
+        if (showInfoDialog) {
+            AlertDialog(
+                onDismissRequest = { showInfoDialog = false },
+                title = { Text("Server Information") },
+                text = {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("Status:", style = MaterialTheme.typography.labelMedium)
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                val statusColor = when (connectionState) {
+                                    ConnectionState.CONNECTED -> MaterialTheme.colorScheme.primary
+                                    ConnectionState.CONNECTING, ConnectionState.RECONNECTING -> MaterialTheme.colorScheme.secondary
+                                    ConnectionState.FAILED -> MaterialTheme.colorScheme.error
+                                    ConnectionState.DISCONNECTED -> MaterialTheme.colorScheme.outline
+                                }
+                                Text(
+                                    text = "●",
+                                    color = statusColor,
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                Text(
+                                    text = connectionState.name.replace("_", " "),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = statusColor
+                                )
+                            }
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("Server:", style = MaterialTheme.typography.labelMedium)
+                            Text(
+                                text = settingsRepository.getServerUrl().ifEmpty { "Not configured" },
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+
+                        if (hasCredentials) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("Device:", style = MaterialTheme.typography.labelMedium)
+                                Text("Authenticated", style = MaterialTheme.typography.bodyMedium)
+                            }
+                        }
+
+                        if (currentSession != null) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("Session:", style = MaterialTheme.typography.labelMedium)
+                                Text(
+                                    text = "${currentSession!!.take(8)}...",
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { showInfoDialog = false }) {
+                        Text("Close")
+                    }
+                }
+            )
         }
     }
 }

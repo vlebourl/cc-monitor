@@ -149,7 +149,9 @@ class QRScanActivity : ComponentActivity() {
             // Extract base server URL (remove path and query)
             val serverUrl = "${url.protocol}://${url.host}${if (url.port != -1 && url.port != 80 && url.port != 443) ":${url.port}" else ""}"
 
-            // Convert HTTP URL to WebSocket URL
+            // Convert HTTP URL to WebSocket URL (same host and port, just change protocol)
+            // Since you're using reverse proxy with WebSocket support,
+            // the WebSocket uses the same URL as HTTP, just with ws/wss protocol
             val wsUrl = serverUrl.replace("https://", "wss://").replace("http://", "ws://")
 
             QRData(
