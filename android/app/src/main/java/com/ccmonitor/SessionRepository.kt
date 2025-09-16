@@ -47,7 +47,7 @@ data class ApiResponse<T>(
 
 class SessionRepository private constructor(
     private val context: Context,
-    private val baseUrl: String = "http://localhost:3000"
+    private val baseUrl: String
 ) {
     private val tag = "SessionRepository"
 
@@ -60,15 +60,26 @@ class SessionRepository private constructor(
         }
     }
 
-    private val authRepository = AuthRepository.getInstance(context)
+    private val authRepository = AuthRepository.getInstance(context, baseUrl)
 
     companion object {
         @Volatile
         private var INSTANCE: SessionRepository? = null
+        @Volatile
+        private var currentBaseUrl: String? = null
 
-        fun getInstance(context: Context, baseUrl: String = "http://localhost:3000"): SessionRepository {
-            return INSTANCE ?: synchronized(this) {
-                INSTANCE ?: SessionRepository(context.applicationContext, baseUrl).also { INSTANCE = it }
+        fun getInstance(context: Context, baseUrl: String): SessionRepository {
+            return if (INSTANCE != null && currentBaseUrl == baseUrl) {
+                INSTANCE!!
+            } else {
+                synchronized(this) {
+                    if (INSTANCE != null && currentBaseUrl != baseUrl) {
+                        INSTANCE?.cleanup()
+                    }
+                    INSTANCE = SessionRepository(context.applicationContext, baseUrl)
+                    currentBaseUrl = baseUrl
+                    INSTANCE!!
+                }
             }
         }
     }
@@ -248,6 +259,9 @@ class SessionRepository private constructor(
 
     fun cleanup() {
         client.close()
-        INSTANCE = null
+        synchronized(SessionRepository::class.java) {
+            INSTANCE = null
+            currentBaseUrl = null
+        }
     }
 }

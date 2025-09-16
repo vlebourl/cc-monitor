@@ -21,7 +21,7 @@ class ConnectionHelper private constructor(
     private val messageCache = MessageCacheRepository.getInstance(context)
     private val settingsRepository = SettingsRepository.getInstance(context)
 
-    private val serverUrl: String
+    private val serverUrl: String?
         get() = customServerUrl ?: settingsRepository.getServerUrl()
 
     private val preferences: SharedPreferences =
@@ -82,7 +82,8 @@ class ConnectionHelper private constructor(
         disconnectInternal()
 
         // Create new WebSocket manager
-        webSocketManager = WebSocketManager(serverUrl).also { manager ->
+        val url = serverUrl ?: return
+        webSocketManager = WebSocketManager(url).also { manager ->
             // Start collecting state changes
             scope.launch {
                 manager.connectionState.collect { state ->

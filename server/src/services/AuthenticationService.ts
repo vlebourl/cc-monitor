@@ -55,6 +55,10 @@ export class AuthenticationService extends EventEmitter {
     const guestToken = this.generateGuestToken();
     const authUrl = `${this.options.baseUrl}/auth?token=${guestToken.token}`;
 
+    console.log(`🔑 [AUTH] Generated new guest token: ${guestToken.token}`);
+    console.log(`🔗 [AUTH] Auth URL: ${authUrl}`);
+    console.log(`⏰ [AUTH] Token expires at: ${guestToken.expires.toISOString()}`);
+
     try {
       // Generate QR code as SVG string
       const qrCodeSvg = await QRCode.toString(authUrl, {
@@ -102,19 +106,25 @@ export class AuthenticationService extends EventEmitter {
    * Authenticate mobile device using guest token
    */
   async authenticateMobile(guestToken: string, deviceId: string): Promise<{ apiKey: string; serverInfo: object }> {
+    console.log(`🔐 [AUTH] Authentication attempt - Token: ${guestToken}, Device: ${deviceId}`);
+    console.log(`🗂️  [AUTH] Available guest tokens: ${Array.from(this.guestTokens.keys()).join(', ')}`);
+
     const token = this.guestTokens.get(guestToken);
 
     if (!token) {
+      console.log(`❌ [AUTH] Invalid guest token: ${guestToken}`);
       this.emit('authenticationFailed', { reason: 'invalid_token', guestToken });
       throw new Error('Invalid guest token');
     }
 
     if (token.used) {
+      console.log(`❌ [AUTH] Guest token already used: ${guestToken}`);
       this.emit('authenticationFailed', { reason: 'token_already_used', guestToken });
       throw new Error('Guest token already used');
     }
 
     if (new Date() > token.expires) {
+      console.log(`❌ [AUTH] Guest token expired: ${guestToken} (expired: ${token.expires.toISOString()})`);
       this.guestTokens.delete(guestToken);
       this.emit('authenticationFailed', { reason: 'token_expired', guestToken });
       throw new Error('Guest token expired');
@@ -138,6 +148,10 @@ export class AuthenticationService extends EventEmitter {
       websocketUrl: this.options.baseUrl.replace('http', 'ws')
     };
 
+    console.log(`✅ [AUTH] Authentication successful - Generated API key: ${apiKey.key.substring(0, 8)}...`);
+    console.log(`📡 [AUTH] WebSocket URL: ${serverInfo.websocketUrl}`);
+    console.log(`📱 [AUTH] Device registered: ${deviceId}`);
+
     this.emit('deviceAuthenticated', {
       deviceId,
       apiKey: apiKey.key,
@@ -154,17 +168,23 @@ export class AuthenticationService extends EventEmitter {
    * Validate API key for WebSocket connections
    */
   validateApiKey(apiKey: string): boolean {
+    console.log(`🔍 [AUTH] Validating API key: ${apiKey ? apiKey.substring(0, 8) + '...' : 'null'}`);
+
     const key = this.apiKeys.get(apiKey);
 
     if (!key) {
+      console.log(`❌ [AUTH] API key not found: ${apiKey ? apiKey.substring(0, 8) + '...' : 'null'}`);
+      console.log(`📋 [AUTH] Available API keys: ${Array.from(this.apiKeys.keys()).map(k => k.substring(0, 8) + '...').join(', ')}`);
       return false;
     }
 
     if (key.revoked) {
+      console.log(`❌ [AUTH] API key revoked: ${apiKey.substring(0, 8)}...`);
       return false;
     }
 
     if (new Date() > key.expiresAt) {
+      console.log(`❌ [AUTH] API key expired: ${apiKey.substring(0, 8)}... (expired: ${key.expiresAt.toISOString()})`);
       this.revokeApiKey(apiKey);
       return false;
     }
@@ -172,6 +192,7 @@ export class AuthenticationService extends EventEmitter {
     // Update last used timestamp
     key.lastUsed = new Date();
 
+    console.log(`✅ [AUTH] API key validated successfully: ${apiKey.substring(0, 8)}...`);
     return true;
   }
 

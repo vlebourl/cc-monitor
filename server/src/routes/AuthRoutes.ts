@@ -9,9 +9,13 @@ export function createAuthRoutes(authService: AuthenticationService): Router {
    * POST /api/auth/qr
    */
   router.post('/qr', async (req: Request, res: Response) => {
+    console.log(`🎯 [ROUTE] QR generation request from ${req.ip}`);
+
     try {
+      console.log(`🚀 [ROUTE] Calling authService.generateAuthQR...`);
       const result = await authService.generateAuthQR();
 
+      console.log(`✅ [ROUTE] QR code generated successfully`);
       res.json({
         success: true,
         data: {
@@ -25,6 +29,7 @@ export function createAuthRoutes(authService: AuthenticationService): Router {
       });
 
     } catch (error) {
+      console.log(`❌ [ROUTE] QR generation failed:`, error);
       res.status(500).json({
         success: false,
         error: 'Failed to generate QR code',
@@ -39,10 +44,17 @@ export function createAuthRoutes(authService: AuthenticationService): Router {
    * POST /api/auth/mobile
    */
   router.post('/mobile', async (req: Request, res: Response) => {
+    console.log(`📱 [ROUTE] Mobile authentication request from ${req.ip}`);
+    console.log(`📦 [ROUTE] Request body:`, JSON.stringify(req.body, null, 2));
+    console.log(`🌐 [ROUTE] Request headers:`, JSON.stringify(req.headers, null, 2));
+
     try {
       const { guestToken, deviceId } = req.body;
 
+      console.log(`🔍 [ROUTE] Extracted - guestToken: ${guestToken}, deviceId: ${deviceId}`);
+
       if (!guestToken || !deviceId) {
+        console.log(`❌ [ROUTE] Missing required fields - guestToken: ${!!guestToken}, deviceId: ${!!deviceId}`);
         return res.status(400).json({
           success: false,
           error: 'Missing required fields',
@@ -51,8 +63,10 @@ export function createAuthRoutes(authService: AuthenticationService): Router {
         });
       }
 
+      console.log(`🚀 [ROUTE] Calling authService.authenticateMobile...`);
       const result = await authService.authenticateMobile(guestToken, deviceId);
 
+      console.log(`✅ [ROUTE] Authentication successful, sending response`);
       return res.json({
         success: true,
         data: {
@@ -64,10 +78,13 @@ export function createAuthRoutes(authService: AuthenticationService): Router {
       });
 
     } catch (error) {
+      console.log(`❌ [ROUTE] Authentication failed:`, error);
+
       const statusCode = error instanceof Error && error.message.includes('Invalid') ? 401 :
                         error instanceof Error && error.message.includes('expired') ? 410 :
                         error instanceof Error && error.message.includes('used') ? 409 : 500;
 
+      console.log(`📤 [ROUTE] Sending error response with status ${statusCode}`);
       return res.status(statusCode).json({
         success: false,
         error: 'Authentication failed',

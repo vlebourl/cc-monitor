@@ -114,6 +114,37 @@ The server will be available at:
 
 ## Development
 
+### Version Management
+
+**CRITICAL**: Always bump version numbers after any code change:
+
+1. Update `VERSION` file (e.g., `1.1.0` → `1.1.1`)
+2. Update `server/package.json` version field
+3. Update Android `android/app/build.gradle`:
+   - Increment `versionCode` (integer)
+   - Update `versionName` (string)
+4. Commit and push to trigger GitHub Actions pipeline
+
+**Example version bump:**
+```bash
+# Update VERSION file to 1.1.1
+echo "1.1.1" > VERSION
+
+# Update server/package.json
+sed -i 's/"version": "1.1.0"/"version": "1.1.1"/' server/package.json
+
+# Update Android build.gradle
+sed -i 's/versionCode 2/versionCode 3/' android/app/build.gradle
+sed -i 's/versionName "1.1.0"/versionName "1.1.1"/' android/app/build.gradle
+
+# Commit and push
+git add VERSION server/package.json android/app/build.gradle
+git commit -m "Bump version to 1.1.1"
+git push
+```
+
+This ensures proper tracking and allows users to distinguish between different builds.
+
 ### Project Structure
 ```
 cc-monitor/

@@ -83,7 +83,7 @@ data class ApiKeyInfoResponse(
 
 class AuthRepository private constructor(
     private val context: Context,
-    private val baseUrl: String = "http://localhost:3000"
+    private val baseUrl: String
 ) {
     private val tag = "AuthRepository"
 
@@ -116,10 +116,21 @@ class AuthRepository private constructor(
     companion object {
         @Volatile
         private var INSTANCE: AuthRepository? = null
+        @Volatile
+        private var currentBaseUrl: String? = null
 
-        fun getInstance(context: Context, baseUrl: String = "http://localhost:3000"): AuthRepository {
-            return INSTANCE ?: synchronized(this) {
-                INSTANCE ?: AuthRepository(context.applicationContext, baseUrl).also { INSTANCE = it }
+        fun getInstance(context: Context, baseUrl: String): AuthRepository {
+            return if (INSTANCE != null && currentBaseUrl == baseUrl) {
+                INSTANCE!!
+            } else {
+                synchronized(this) {
+                    if (INSTANCE != null && currentBaseUrl != baseUrl) {
+                        INSTANCE?.cleanup()
+                    }
+                    INSTANCE = AuthRepository(context.applicationContext, baseUrl)
+                    currentBaseUrl = baseUrl
+                    INSTANCE!!
+                }
             }
         }
     }
@@ -347,6 +358,9 @@ class AuthRepository private constructor(
 
     fun cleanup() {
         client.close()
-        INSTANCE = null
+        synchronized(AuthRepository::class.java) {
+            INSTANCE = null
+            currentBaseUrl = null
+        }
     }
 }

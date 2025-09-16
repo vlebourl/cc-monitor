@@ -101,6 +101,11 @@ export class WebSocketServer extends EventEmitter {
     const sessionId = url.searchParams.get('sessionId');
     const apiKey = url.searchParams.get('apiKey');
 
+    console.log(`🔌 [WS] New WebSocket connection - Client: ${clientId}`);
+    console.log(`🌐 [WS] Connection URL: ${request.url}`);
+    console.log(`🔍 [WS] Session ID: ${sessionId || 'none'}`);
+    console.log(`🗝️  [WS] API Key: ${apiKey ? apiKey.substring(0, 8) + '...' : 'none'}`);
+
     const client: WebSocketClient = {
       id: clientId,
       socket,
@@ -120,11 +125,15 @@ export class WebSocketServer extends EventEmitter {
 
     // If session ID is provided, add to session clients
     if (sessionId && this.isAuthenticated(client)) {
+      console.log(`✅ [WS] Client authenticated, adding to session: ${sessionId}`);
       this.addClientToSession(clientId, sessionId);
+    } else if (sessionId) {
+      console.log(`❌ [WS] Client not authenticated for session: ${sessionId}`);
     }
 
     this.emit('clientConnected', { clientId, sessionId, apiKey });
 
+    console.log(`📤 [WS] Sending welcome message to client: ${clientId}`);
     // Send welcome message
     this.sendToClient(clientId, {
       type: 'connected',

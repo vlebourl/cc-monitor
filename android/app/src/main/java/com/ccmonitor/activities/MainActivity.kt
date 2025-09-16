@@ -23,6 +23,7 @@ import com.ccmonitor.AuthRepository
 import com.ccmonitor.ConnectionState
 import com.ccmonitor.repository.SettingsRepository
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.flowOf
 
 class MainActivity : ComponentActivity() {
 
@@ -46,43 +47,55 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MainScreen() {
     val context = LocalContext.current
-    val connectionHelper = remember { ConnectionHelper.getInstance(context) }
-    val authRepository = remember { AuthRepository.getInstance(context) }
     val settingsRepository = remember { SettingsRepository.getInstance(context) }
     val scope = rememberCoroutineScope()
 
+    // Check if server is configured
+    val serverWsUrl = settingsRepository.getServerUrl()
+    val serverHttpUrl = settingsRepository.getHttpUrl()
+
+    // Only create repositories if server URL is configured
+    val connectionHelper = remember(serverWsUrl) {
+        if (serverWsUrl != null) ConnectionHelper.getInstance(context, serverWsUrl) else null
+    }
+    val authRepository = remember(serverHttpUrl) {
+        if (serverHttpUrl != null) AuthRepository.getInstance(context, serverHttpUrl) else null
+    }
+
     // Observe connection state
-    val connectionState by connectionHelper.connectionState.collectAsState()
-    val currentSession by connectionHelper.currentSession.collectAsState()
-    val errors by connectionHelper.errors.collectAsState(initial = "")
+    val connectionState by (connectionHelper?.connectionState ?: flowOf(ConnectionState.DISCONNECTED)).collectAsState(initial = ConnectionState.DISCONNECTED)
+    val currentSession by (connectionHelper?.currentSession ?: flowOf(null)).collectAsState(initial = null)
+    val errors by (connectionHelper?.errors ?: flowOf("")).collectAsState(initial = "")
 
     // Check for existing credentials on startup
     var hasCredentials by remember { mutableStateOf(false) }
     var isCheckingCredentials by remember { mutableStateOf(true) }
 
-    LaunchedEffect(Unit) {
-        hasCredentials = authRepository.hasValidCredentials()
+    LaunchedEffect(authRepository) {
+        if (authRepository != null) {
+            hasCredentials = authRepository.hasValidCredentials()
 
-        if (hasCredentials) {
-            // Try to validate and auto-connect
-            val validationResult = authRepository.validateStoredCredentials()
-            validationResult.fold(
-                onSuccess = { isValid ->
-                    if (isValid) {
-                        val apiKey = authRepository.getApiKey()
-                        if (apiKey != null) {
-                            connectionHelper.connect(apiKey)
+            if (hasCredentials) {
+                // Try to validate and auto-connect
+                val validationResult = authRepository.validateStoredCredentials()
+                validationResult.fold(
+                    onSuccess = { isValid ->
+                        if (isValid) {
+                            val apiKey = authRepository.getApiKey()
+                            if (apiKey != null && connectionHelper != null) {
+                                connectionHelper.connect(apiKey)
+                            }
+                        } else {
+                            authRepository.clearStoredCredentials()
+                            hasCredentials = false
                         }
-                    } else {
+                    },
+                    onFailure = {
                         authRepository.clearStoredCredentials()
                         hasCredentials = false
                     }
-                },
-                onFailure = {
-                    authRepository.clearStoredCredentials()
-                    hasCredentials = false
-                }
-            )
+                )
+            }
         }
 
         isCheckingCredentials = false
@@ -254,7 +267,7 @@ fun MainScreen() {
                                 Button(
                                     onClick = {
                                         scope.launch {
-                                            connectionHelper.reconnect()
+                                            connectionHelper?.reconnect()
                                         }
                                     },
                                     modifier = Modifier.fillMaxWidth(),
@@ -291,8 +304,8 @@ fun MainScreen() {
                                 OutlinedButton(
                                     onClick = {
                                         scope.launch {
-                                            authRepository.clearStoredCredentials()
-                                            connectionHelper.disconnect()
+                                            authRepository?.clearStoredCredentials()
+                                            connectionHelper?.disconnect()
                                             hasCredentials = false
                                         }
                                     },
@@ -304,11 +317,11 @@ fun MainScreen() {
                                 OutlinedButton(
                                     onClick = {
                                         scope.launch {
-                                            val result = authRepository.refreshApiKey()
-                                            result.fold(
+                                            val result = authRepository?.refreshApiKey()
+                                            result?.fold(
                                                 onSuccess = {
                                                     // Reconnect with new key
-                                                    connectionHelper.reconnect()
+                                                    connectionHelper?.reconnect()
                                                 },
                                                 onFailure = {
                                                     // Handle refresh failure
@@ -370,7 +383,7 @@ fun MainScreen() {
                         ) {
                             Text("Server:", style = MaterialTheme.typography.labelMedium)
                             Text(
-                                text = settingsRepository.getServerUrl().ifEmpty { "Not configured" },
+                                text = (settingsRepository.getServerUrl() ?: "").ifEmpty { "Not configured" },
                                 style = MaterialTheme.typography.bodyMedium
                             )
                         }
@@ -411,6 +424,7 @@ fun MainScreen() {
         if (showManualSetupDialog) {
             var configToken by remember { mutableStateOf("") }
             var isProcessing by remember { mutableStateOf(false) }
+            var errorMessage by remember { mutableStateOf<String?>(null) }
 
             AlertDialog(
                 onDismissRequest = { showManualSetupDialog = false },
@@ -444,6 +458,14 @@ fun MainScreen() {
                                 Text("Configuring...", style = MaterialTheme.typography.bodySmall)
                             }
                         }
+
+                        errorMessage?.let { error ->
+                            Text(
+                                text = error,
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
                     }
                 },
                 confirmButton = {
@@ -452,6 +474,7 @@ fun MainScreen() {
                             if (configToken.isNotBlank() && !isProcessing) {
                                 scope.launch {
                                     isProcessing = true
+                                    errorMessage = null
                                     try {
                                         // Extract QR data from the pasted token
                                         val qrData = extractQRDataFromToken(configToken.trim())
@@ -475,12 +498,14 @@ fun MainScreen() {
                                                     showManualSetupDialog = false
                                                 },
                                                 onFailure = { error ->
-                                                    // Keep dialog open, show error
+                                                    errorMessage = "Authentication failed: ${error.message}"
                                                 }
                                             )
+                                        } else {
+                                            errorMessage = "Invalid configuration URL format. Please copy the full URL from your server."
                                         }
                                     } catch (e: Exception) {
-                                        // Keep dialog open, show error
+                                        errorMessage = "Configuration failed: ${e.message}"
                                     } finally {
                                         isProcessing = false
                                     }

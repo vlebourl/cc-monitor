@@ -22,6 +22,7 @@ import com.ccmonitor.SessionInfo
 import com.ccmonitor.SessionOccupiedInfo
 import com.ccmonitor.ConnectionHelper
 import com.ccmonitor.ui.SessionOccupiedDialog
+import com.ccmonitor.repository.SettingsRepository
 import kotlinx.coroutines.launch
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -47,8 +48,19 @@ class SessionListActivity : ComponentActivity() {
 @Composable
 fun SessionListScreen() {
     val context = LocalContext.current
-    val sessionRepository = remember { SessionRepository.getInstance(context) }
-    val connectionHelper = remember { ConnectionHelper.getInstance(context) }
+    val settingsRepository = remember { SettingsRepository.getInstance(context) }
+
+    // Check if server is configured
+    val serverWsUrl = settingsRepository.getServerUrl()
+    val serverHttpUrl = settingsRepository.getHttpUrl()
+
+    // Only create repositories if server URL is configured
+    val sessionRepository = remember(serverHttpUrl) {
+        if (serverHttpUrl != null) SessionRepository.getInstance(context, serverHttpUrl) else null
+    }
+    val connectionHelper = remember(serverWsUrl) {
+        if (serverWsUrl != null) ConnectionHelper.getInstance(context, serverWsUrl) else null
+    }
     val scope = rememberCoroutineScope()
 
     var sessions by remember { mutableStateOf<List<SessionInfo>>(emptyList()) }
@@ -66,6 +78,7 @@ fun SessionListScreen() {
 
     // Load sessions
     fun loadSessions(filter: String = "all") {
+        if (sessionRepository == null) return
         scope.launch {
             isLoading = true
             errorMessage = null
@@ -88,7 +101,7 @@ fun SessionListScreen() {
                     sessions = if (searchQuery.isNotEmpty()) {
                         sessionList.filter { session ->
                             session.sessionId.contains(searchQuery, ignoreCase = true) ||
-                            sessionRepository.getProjectName(session.filePath).contains(searchQuery, ignoreCase = true)
+                            sessionRepository?.getProjectName(session.filePath)?.contains(searchQuery, ignoreCase = true) ?: false
                         }
                     } else {
                         sessionList
@@ -114,8 +127,8 @@ fun SessionListScreen() {
     }
 
     // Listen for session occupied events
-    LaunchedEffect(Unit) {
-        connectionHelper.sessionOccupied.collect { occupiedInfo ->
+    LaunchedEffect(connectionHelper) {
+        connectionHelper?.sessionOccupied?.collect { occupiedInfo ->
             sessionOccupiedInfo = occupiedInfo
         }
     }
@@ -279,31 +292,36 @@ fun SessionListScreen() {
                                 SessionCard(
                                     session = session,
                                     onSessionClick = { sessionInfo ->
-                                        // Add to recently viewed
-                                        sessionRepository.addToRecentlyViewed(sessionInfo.sessionId)
+                                        if (sessionRepository != null && connectionHelper != null) {
+                                            // Add to recently viewed
+                                            sessionRepository.addToRecentlyViewed(sessionInfo.sessionId)
 
-                                        // Connect to session
-                                        connectionHelper.subscribeToSession(sessionInfo.sessionId)
+                                            // Connect to session
+                                            connectionHelper.subscribeToSession(sessionInfo.sessionId)
 
-                                        // Navigate to message display
-                                        val intent = Intent(context, MessageDisplayActivity::class.java).apply {
-                                            putExtra("sessionId", sessionInfo.sessionId)
-                                            putExtra("projectName", sessionRepository.getProjectName(sessionInfo.filePath))
+                                            // Navigate to message display
+                                            val intent = Intent(context, MessageDisplayActivity::class.java).apply {
+                                                putExtra("sessionId", sessionInfo.sessionId)
+                                                putExtra("projectName", sessionRepository.getProjectName(sessionInfo.filePath))
+                                            }
+                                            context.startActivity(intent)
                                         }
-                                        context.startActivity(intent)
                                     },
                                     onFavoriteClick = { sessionInfo ->
-                                        if (sessionRepository.isSessionFavorite(sessionInfo.sessionId)) {
-                                            sessionRepository.removeFavoriteSession(sessionInfo.sessionId)
-                                        } else {
-                                            sessionRepository.markSessionAsFavorite(sessionInfo.sessionId)
-                                        }
-                                        // Reload if on favorites tab
-                                        if (selectedTab == 3) {
-                                            loadSessions("favorites")
+                                        if (sessionRepository != null) {
+                                            if (sessionRepository.isSessionFavorite(sessionInfo.sessionId)) {
+                                                sessionRepository.removeFavoriteSession(sessionInfo.sessionId)
+                                            } else {
+                                                sessionRepository.markSessionAsFavorite(sessionInfo.sessionId)
+                                            }
+                                            // Reload if on favorites tab
+                                            if (selectedTab == 3) {
+                                                loadSessions("favorites")
+                                            }
                                         }
                                     },
-                                    isFavorite = sessionRepository.isSessionFavorite(session.sessionId)
+                                    isFavorite = sessionRepository?.isSessionFavorite(session.sessionId) ?: false,
+                                    sessionRepository = sessionRepository
                                 )
                             }
                         }
@@ -320,7 +338,7 @@ fun SessionListScreen() {
             onDismiss = { sessionOccupiedInfo = null },
             onTakeOver = {
                 // Force takeover the session
-                connectionHelper.subscribeToSession(occupiedInfo.sessionId, forceTakeover = true)
+                connectionHelper?.subscribeToSession(occupiedInfo.sessionId, forceTakeover = true)
                 sessionOccupiedInfo = null
 
                 // Navigate to message display
@@ -341,9 +359,9 @@ fun SessionCard(
     session: SessionInfo,
     onSessionClick: (SessionInfo) -> Unit,
     onFavoriteClick: (SessionInfo) -> Unit,
-    isFavorite: Boolean
+    isFavorite: Boolean,
+    sessionRepository: SessionRepository?
 ) {
-    val sessionRepository = SessionRepository.getInstance(LocalContext.current)
 
     Card(
         onClick = { onSessionClick(session) },
@@ -361,13 +379,13 @@ fun SessionCard(
             ) {
                 // Project name and session ID
                 Text(
-                    text = sessionRepository.getProjectName(session.filePath),
+                    text = sessionRepository?.getProjectName(session.filePath) ?: "Unknown Project",
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
 
                 Text(
-                    text = sessionRepository.formatSessionId(session.sessionId),
+                    text = sessionRepository?.formatSessionId(session.sessionId) ?: session.sessionId.take(8),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

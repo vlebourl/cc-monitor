@@ -62,7 +62,7 @@ fun SettingsScreen(
 
     // Load current settings
     LaunchedEffect(Unit) {
-        serverUrl = settingsRepository.getServerUrl()
+        serverUrl = settingsRepository.getServerUrl() ?: ""
     }
 
     Scaffold(
@@ -313,7 +313,7 @@ fun SettingsScreen(
                     }
 
                     Text(
-                        text = "Current URL: ${settingsRepository.getServerUrl().ifEmpty { "Not configured" }}",
+                        text = "Current URL: ${(settingsRepository.getServerUrl() ?: "").ifEmpty { "Not configured" }}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                     )

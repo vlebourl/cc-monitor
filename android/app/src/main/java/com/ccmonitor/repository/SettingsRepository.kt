@@ -11,7 +11,7 @@ class SettingsRepository private constructor(private val context: Context) {
         @Volatile
         private var INSTANCE: SettingsRepository? = null
         private const val KEY_SERVER_URL = "server_url"
-        private const val DEFAULT_SERVER_URL = "ws://localhost:8080"
+        private const val DEFAULT_SERVER_URL = ""
 
         fun getInstance(context: Context): SettingsRepository {
             return INSTANCE ?: synchronized(this) {
@@ -20,8 +20,9 @@ class SettingsRepository private constructor(private val context: Context) {
         }
     }
 
-    fun getServerUrl(): String {
-        return preferences.getString(KEY_SERVER_URL, DEFAULT_SERVER_URL) ?: DEFAULT_SERVER_URL
+    fun getServerUrl(): String? {
+        val url = preferences.getString(KEY_SERVER_URL, DEFAULT_SERVER_URL) ?: DEFAULT_SERVER_URL
+        return if (url.isEmpty()) null else url
     }
 
     fun saveServerUrl(url: String) {
@@ -42,8 +43,7 @@ class SettingsRepository private constructor(private val context: Context) {
     }
 
     fun hasCustomServerUrl(): Boolean {
-        return preferences.contains(KEY_SERVER_URL) &&
-               getServerUrl() != DEFAULT_SERVER_URL
+        return getServerUrl() != null
     }
 
     private fun isValidWebSocketUrl(url: String): Boolean {
@@ -104,13 +104,13 @@ class SettingsRepository private constructor(private val context: Context) {
     }
 
     // Get different URL formats
-    fun getHttpUrl(): String {
-        val wsUrl = getServerUrl()
+    fun getHttpUrl(): String? {
+        val wsUrl = getServerUrl() ?: return null
         return wsUrl.replace("ws://", "http://").replace("wss://", "https://")
     }
 
-    fun getHealthCheckUrl(): String {
-        val httpUrl = getHttpUrl()
+    fun getHealthCheckUrl(): String? {
+        val httpUrl = getHttpUrl() ?: return null
         val uri = java.net.URI(httpUrl)
         val healthPort = if (uri.port == 8080) 3000 else uri.port
         return "http://${uri.host}:${healthPort}/health"
