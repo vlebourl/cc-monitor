@@ -1,7 +1,14 @@
 plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
+    id 'org.jetbrains.kotlin.plugin.serialization'
     id 'kotlin-kapt'
+}
+
+// Force compatible serialization version
+configurations.all {
+    resolutionStrategy.force 'org.jetbrains.kotlinx:kotlinx-serialization-core:1.6.3'
+    resolutionStrategy.force 'org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3'
 }
 
 android {
@@ -108,6 +115,10 @@ dependencies {
     implementation "io.ktor:ktor-client-logging:$ktor_version"
     implementation "io.ktor:ktor-client-content-negotiation:$ktor_version"
     implementation "io.ktor:ktor-serialization-kotlinx-json:$ktor_version"
+
+    // Kotlinx Serialization compatible with Kotlin 1.9.20
+    implementation 'org.jetbrains.kotlinx:kotlinx-serialization-core:1.6.3'
+    implementation 'org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3'
 
     // ML Kit for QR code scanning
     implementation 'com.google.mlkit:barcode-scanning:17.2.0'

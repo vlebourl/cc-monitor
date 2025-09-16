@@ -2,6 +2,9 @@ import { EventEmitter } from 'events';
 import * as crypto from 'crypto';
 import QRCode from 'qrcode';
 
+// Load package.json for version info
+const packageJson = require('../../package.json');
+
 export interface GuestToken {
   token: string;
   expires: Date;
@@ -129,7 +132,7 @@ export class AuthenticationService extends EventEmitter {
     this.guestTokens.delete(guestToken);
 
     const serverInfo = {
-      version: '1.0.0',
+      version: packageJson.version,
       features: ['session_monitoring', 'real_time_streaming', 'state_detection'],
       protocol: 'Claude Code Monitor Protocol v1.0',
       websocketUrl: this.options.baseUrl.replace('http', 'ws') + ':8080'

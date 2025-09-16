@@ -13,6 +13,9 @@ import { AuthenticationService } from './services/AuthenticationService';
 import { createAuthRoutes } from './routes/AuthRoutes';
 import { requireAuth, optionalAuth } from './middleware/AuthMiddleware';
 
+// Load package.json for version info
+const packageJson = require('../package.json');
+
 // Load environment variables
 config();
 
@@ -75,7 +78,7 @@ app.use('/api/auth', createAuthRoutes(authService));
 // Version endpoint for compatibility checks
 app.get('/version', (req, res) => {
   res.json({
-    version: '1.0.0',
+    version: packageJson.version,
     apiVersion: '1.0',
     protocolVersion: '1.0',
     features: [
@@ -86,7 +89,7 @@ app.get('/version', (req, res) => {
       'file-streaming',
       'real-time-sync'
     ],
-    minClientVersion: '1.0.0',
+    minClientVersion: packageJson.version,
     compatibilityLevel: 'stable'
   });
 });
@@ -96,7 +99,7 @@ app.get('/health', (req, res) => {
   res.json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
-    version: '1.0.0',
+    version: packageJson.version,
     services: {
       fileMonitor: fileMonitor.isMonitoring(),
       webSocket: wsServer.isRunning(),
@@ -109,7 +112,7 @@ app.get('/health', (req, res) => {
 app.get('/api', (req, res) => {
   res.json({
     name: 'Claude Code Monitor Server',
-    version: '1.0.0',
+    version: packageJson.version,
     description: 'Remote monitoring system for Claude Code sessions',
     endpoints: {
       health: '/health',
