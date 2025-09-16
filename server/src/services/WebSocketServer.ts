@@ -1,6 +1,6 @@
 import WebSocket, { WebSocketServer as WSServer } from 'ws';
 import { EventEmitter } from 'events';
-import { IncomingMessage } from 'http';
+import { IncomingMessage, Server as HTTPServer } from 'http';
 import { URL } from 'url';
 import { WebSocketMessage, SessionMessage } from '../types/ClaudeCodeTypes';
 
@@ -17,6 +17,7 @@ export interface WebSocketClient {
 export interface WebSocketServerOptions {
   port?: number;
   host?: string;
+  server?: HTTPServer;
   pingInterval?: number;
   connectionTimeout?: number;
 }
@@ -26,7 +27,7 @@ export class WebSocketServer extends EventEmitter {
   private clients = new Map<string, WebSocketClient>();
   private sessionClients = new Map<string, Set<string>>();
   private pingTimer?: NodeJS.Timeout;
-  private options: Required<WebSocketServerOptions>;
+  private options: WebSocketServerOptions & { pingInterval: number; connectionTimeout: number };
 
   constructor(options: WebSocketServerOptions = {}) {
     super();
@@ -34,17 +35,27 @@ export class WebSocketServer extends EventEmitter {
     this.options = {
       port: options.port || 8080,
       host: options.host || 'localhost',
+      server: options.server,
       pingInterval: options.pingInterval || 30000, // 30 seconds
       connectionTimeout: options.connectionTimeout || 60000 // 60 seconds
     };
   }
 
   async start(): Promise<void> {
-    this.server = new WSServer({
-      port: this.options.port,
-      host: this.options.host,
+    const wsConfig: any = {
       verifyClient: this.verifyClient.bind(this)
-    });
+    };
+
+    if (this.options.server) {
+      // Use existing HTTP server
+      wsConfig.server = this.options.server;
+    } else {
+      // Create standalone WebSocket server
+      wsConfig.port = this.options.port;
+      wsConfig.host = this.options.host;
+    }
+
+    this.server = new WSServer(wsConfig);
 
     this.server.on('connection', this.handleConnection.bind(this));
     this.server.on('error', this.handleServerError.bind(this));

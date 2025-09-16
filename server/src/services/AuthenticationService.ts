@@ -135,7 +135,7 @@ export class AuthenticationService extends EventEmitter {
       version: packageJson.version,
       features: ['session_monitoring', 'real_time_streaming', 'state_detection'],
       protocol: 'Claude Code Monitor Protocol v1.0',
-      websocketUrl: this.options.baseUrl.replace('http', 'ws') + ':8080'
+      websocketUrl: this.options.baseUrl.replace('http', 'ws')
     };
 
     this.emit('deviceAuthenticated', {

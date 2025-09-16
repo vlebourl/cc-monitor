@@ -21,15 +21,14 @@ config();
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
-const WS_PORT = Number(process.env.WS_PORT) || 8080;
 
 // Public URL configuration for reverse proxy support
 const PUBLIC_URL = process.env.PUBLIC_URL || `http://localhost:${PORT}`;
-const PUBLIC_WS_URL = process.env.PUBLIC_WS_URL || `ws://localhost:${WS_PORT}`;
+const PUBLIC_WS_URL = process.env.PUBLIC_WS_URL || PUBLIC_URL.replace('http', 'ws');
 
 console.log('🌐 Server Configuration:');
 console.log(`  Internal HTTP: http://localhost:${PORT}`);
-console.log(`  Internal WebSocket: ws://localhost:${WS_PORT}`);
+console.log(`  Internal WebSocket: ${PUBLIC_WS_URL}`);
 console.log(`  Public URL: ${PUBLIC_URL}`);
 console.log(`  Public WebSocket: ${PUBLIC_WS_URL}`);
 
@@ -60,8 +59,7 @@ const authService = new AuthenticationService({
 });
 
 const wsServer = new WebSocketServer({
-  port: WS_PORT,
-  host: process.env.WS_HOST || 'localhost',
+  server: httpServer,  // Use the same HTTP server
   pingInterval: Number(process.env.PING_INTERVAL) || 30000
 });
 
@@ -206,19 +204,20 @@ async function startServer() {
     await fileMonitor.start();
     console.log('✓ File monitor started');
 
-    // Start WebSocket server
-    console.log('Starting WebSocket server...');
-    await wsServer.start();
-    console.log(`✓ WebSocket server started on port ${WS_PORT}`);
-
-    // Start HTTP server
-    httpServer.listen(PORT, () => {
+    // Start HTTP server with WebSocket
+    httpServer.listen(PORT, async () => {
       console.log(`✓ HTTP server started on port ${PORT}`);
+
+      // Start WebSocket server on the same HTTP server
+      console.log('Starting WebSocket server...');
+      await wsServer.start();
+      console.log(`✓ WebSocket server started on the same port`);
+
       console.log('');
       console.log('Services running:');
       console.log(`  HTTP API (internal): http://localhost:${PORT}`);
       console.log(`  HTTP API (public): ${PUBLIC_URL}`);
-      console.log(`  WebSocket (internal): ws://localhost:${WS_PORT}`);
+      console.log(`  WebSocket (internal): ${PUBLIC_WS_URL}`);
       console.log(`  WebSocket (public): ${PUBLIC_WS_URL}`);
       console.log(`  Health Check: ${PUBLIC_URL}/health`);
       console.log('');
