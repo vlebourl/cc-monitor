@@ -100,13 +100,16 @@ class QRScanActivity : ComponentActivity() {
                     Toast.makeText(this@QRScanActivity, "Server configured: ${qrData.serverUrl}", Toast.LENGTH_SHORT).show()
 
                     // Create instances with the correct server URL
+                    android.util.Log.e("QRScan", "Creating auth repository with server URL: ${qrData.serverUrl}")
                     val authRepository = AuthRepository.getInstance(this@QRScanActivity, qrData.serverUrl)
                     val connectionHelper = ConnectionHelper.getInstance(this@QRScanActivity, qrData.wsUrl)
 
                     // Authenticate with the server
+                    android.util.Log.e("QRScan", "Authenticating with token: ${qrData.guestToken.take(10)}...")
                     val result = authRepository.authenticateWithQRToken(qrData.guestToken, deviceId)
                     result.fold(
                         onSuccess = { authData ->
+                            android.util.Log.e("QRScan", "AUTH SUCCESS! API Key: ${authData.apiKey.take(10)}...")
                             Toast.makeText(this@QRScanActivity, "Authentication successful!", Toast.LENGTH_SHORT).show()
 
                             // Connect to WebSocket with correct URL
@@ -116,6 +119,7 @@ class QRScanActivity : ComponentActivity() {
                             finish()
                         },
                         onFailure = { error ->
+                            android.util.Log.e("QRScan", "AUTH FAILED: ${error.message} - ${error.cause?.message}")
                             Toast.makeText(this@QRScanActivity, "Authentication failed: ${error.message}", Toast.LENGTH_LONG).show()
                         }
                     )

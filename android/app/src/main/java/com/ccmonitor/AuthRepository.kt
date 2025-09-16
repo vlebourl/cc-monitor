@@ -149,7 +149,8 @@ class AuthRepository private constructor(
 
     suspend fun authenticateWithQRToken(guestToken: String, deviceId: String): Result<AuthData> {
         return try {
-            Log.d(tag, "Authenticating with guest token")
+            Log.e(tag, "AUTH: Starting authentication with token: ${guestToken.take(10)}... to URL: $baseUrl/api/auth/mobile")
+            android.util.Log.e("CCMonitor", "Attempting authentication to: $baseUrl/api/auth/mobile")
 
             val request = MobileAuthRequest(guestToken, deviceId)
             val response: MobileAuthResponse = client.post("$baseUrl/api/auth/mobile") {
@@ -158,7 +159,8 @@ class AuthRepository private constructor(
             }.body()
 
             if (response.success && response.data != null) {
-                Log.i(tag, "Authentication successful")
+                Log.e(tag, "AUTH: Authentication successful!")
+                android.util.Log.e("CCMonitor", "Authentication successful, API key received")
 
                 // Save the API key securely
                 saveApiKey(response.data.apiKey, deviceId)
@@ -166,12 +168,14 @@ class AuthRepository private constructor(
                 Result.success(response.data)
             } else {
                 val error = response.error ?: response.message ?: "Authentication failed"
-                Log.e(tag, "Authentication failed: $error")
+                Log.e(tag, "AUTH: Authentication failed with error: $error")
+                android.util.Log.e("CCMonitor", "Authentication failed: $error")
                 Result.failure(Exception(error))
             }
 
         } catch (e: Exception) {
-            Log.e(tag, "Failed to authenticate", e)
+            Log.e(tag, "AUTH: Exception during authentication: ${e.message}", e)
+            android.util.Log.e("CCMonitor", "Connection error: ${e.message} - ${e.cause?.message}")
             Result.failure(e)
         }
     }
