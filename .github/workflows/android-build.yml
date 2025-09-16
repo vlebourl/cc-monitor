@@ -38,14 +38,6 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-gradle-
 
-    - name: Cache Android SDK
-      uses: actions/cache@v4
-      with:
-        path: |
-          ${{ env.ANDROID_SDK_ROOT }}
-        key: ${{ runner.os }}-android-sdk-${{ hashFiles('android/**/*.gradle*') }}
-        restore-keys: |
-          ${{ runner.os }}-android-sdk-
 
     - name: Make gradlew executable
       run: chmod +x android/gradlew
